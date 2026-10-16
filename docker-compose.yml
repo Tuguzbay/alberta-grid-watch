@@ -1,0 +1,19 @@
+services:
+  db:
+    # Same Postgres major + pgvector as Supabase, so local == prod for Phase 4 RAG.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: gridwatch
+      POSTGRES_PASSWORD: gridwatch
+      POSTGRES_DB: gridwatch
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gridwatch:gridwatch@db:5432/gridwatch
+    ports: ["8000:8000"]
+    depends_on: [db]
+volumes:
+  pgdata:
