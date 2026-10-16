@@ -20,11 +20,13 @@ A public tool that uses real data to answer what large new loads, like proposed 
 cp .env.example .env            # add AESO_API_KEY
 python -m venv .venv && . .venv/Scripts/activate   # Windows Git Bash
 pip install -e ".[dev]"
-pytest                          # offline tests
+pytest                          # offline tests (DB tests skip if Postgres isn't up)
 pytest -m live                  # hits real AESO API
 set -a; . ./.env; set +a        # load the key into the shell
 python scripts/check_sources.py # Phase 0 source check
 docker compose up --build       # API on :8000, Postgres+pgvector on :5432
+python scripts/ingest.py --start 2020-01-01   # backfill `hourly` (~1 min), prints quality report
+python scripts/ingest.py        # daily update: re-fetches last 7 days (safe to rerun)
 ```
 
 ## Architecture

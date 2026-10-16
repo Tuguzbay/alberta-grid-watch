@@ -3,6 +3,14 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_USER: gridwatch, POSTGRES_PASSWORD: gridwatch, POSTGRES_DB: gridwatch }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://gridwatch:gridwatch@localhost:5432/gridwatch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
