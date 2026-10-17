@@ -32,8 +32,6 @@ Repo: https://github.com/Tuguzbay/alberta-grid-watch (public). Push over HTTPS (
 ## Next steps
 
 ### Housekeeping (quick)
-- [ ] Remove the Claude co-author line from the first 4 commits (Claude Code's permission check blocks Claude from doing this). In a normal terminal:
-  `git filter-branch -f --msg-filter "sed '/^Co-Authored-By: Claude/d'" -- main` then `git push --force origin main`.
 - [ ] After ~2 weeks of live runs: add an "AESO day-ahead (frozen at 10:00)" row to the load comparison. `daily.py` stores it as model `aeso`, source `live`.
 
 ### Phase 4: RAG assistant
