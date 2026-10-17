@@ -29,17 +29,38 @@ def run(df: pd.DataFrame, first_month: str) -> pd.DataFrame:
         for m in pd.period_range(first_month, month[y.notna()].max(), freq="M"):
             train = (day < m.start_time) & y.notna()
             test = (month == m) & y.notna()
-            assert Xf.loc[test, WEATHER_COLS].notna().all().all(), f"weather forecast gap in {m}"
-            model = HistGradientBoostingRegressor(random_state=0).fit(Xa[train], y[train])
-            preds = {"hgb": model.predict(Xf[test])}
-            preds |= {name: Xf.loc[test, f"{target}_{col}"].to_numpy()
-                      for name, col in BASELINES[target].items()}
-            for name, v in preds.items():
-                out.append(pd.DataFrame({
-                    "ts_utc": df.index[test], "target": target, "model": name,
-                    "issue_date": (day[test] - pd.Timedelta(days=1)).date,
-                    "value": v, "actual": y[test].to_numpy()}))
+            p = _predict(df, Xa, Xf, target, train, test, day)
+            out.append(p.assign(actual=p["ts_utc"].map(y).to_numpy(), source="backtest"))
     return pd.concat(out, ignore_index=True)
+
+
+def forecast_day(df: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
+    """Live forecast of local day `day` from everything in df (whose future actuals are NaN).
+
+    Also records AESO's current load forecast for that day as the `aeso` baseline, so it is
+    frozen at issue time (the stored history gets revised and can't serve as a baseline)."""
+    Xa, Xf = features.build(df, "actual"), features.build(df, "forecast")
+    local = features.local_day(df.index)
+    test = local == pd.Timestamp(day)
+    assert test.any(), f"no hours for {day} in the hourly table; run ingest through that day"
+    out = [_predict(df, Xa, Xf, t, df[t].notna(), test, local) for t in features.TARGETS]
+    out.append(pd.DataFrame({"ts_utc": df.index[test], "target": "load_mw", "model": "aeso",
+                             "issue_date": (local[test] - pd.Timedelta(days=1)).date,
+                             "value": df.loc[test, "load_fc_da"].to_numpy()}))
+    return pd.concat(out, ignore_index=True).assign(source="live")
+
+
+def _predict(df, Xa, Xf, target, train, test, day) -> pd.DataFrame:
+    """Fit on `train` rows (actual weather), predict `test` rows (forecast weather) + baselines."""
+    assert Xf.loc[test, WEATHER_COLS].notna().all().all(), "weather forecast gap in test hours"
+    model = HistGradientBoostingRegressor(random_state=0).fit(Xa[train], df.loc[train, target])
+    preds = {"hgb": model.predict(Xf[test])}
+    preds |= {name: Xf.loc[test, f"{target}_{col}"].to_numpy()
+              for name, col in BASELINES[target].items()}
+    return pd.concat([pd.DataFrame({
+        "ts_utc": df.index[test], "target": target, "model": name,
+        "issue_date": (day[test] - pd.Timedelta(days=1)).date, "value": v})
+        for name, v in preds.items()], ignore_index=True)
 
 
 def metrics(fc: pd.DataFrame) -> pd.DataFrame:

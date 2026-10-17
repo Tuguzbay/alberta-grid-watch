@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS forecasts (
     model text NOT NULL,
     issue_date date NOT NULL,
     value double precision,
-    PRIMARY KEY (ts_utc, target, model)
+    source text NOT NULL DEFAULT 'backtest',  -- 'backtest' or 'live'
+    PRIMARY KEY (ts_utc, target, model, source)
 );"""
 
 
@@ -63,10 +64,23 @@ def hourly_frame(conn: psycopg.Connection) -> pd.DataFrame:
 
 
 def save_forecasts(conn: psycopg.Connection, fc: pd.DataFrame) -> None:
-    """fc columns: ts_utc, target, model, issue_date, value. Replaces matching rows."""
+    """fc columns: ts_utc, target, model, issue_date, value, source. Replaces matching rows."""
+    cols = ["ts_utc", "target", "model", "issue_date", "value", "source"]
     with conn.cursor() as cur:
         cur.executemany(
-            "INSERT INTO forecasts (ts_utc, target, model, issue_date, value) "
-            "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (ts_utc, target, model) "
+            "INSERT INTO forecasts (ts_utc, target, model, issue_date, value, source) "
+            "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (ts_utc, target, model, source) "
             "DO UPDATE SET issue_date = EXCLUDED.issue_date, value = EXCLUDED.value",
-            fc[["ts_utc", "target", "model", "issue_date", "value"]].itertuples(index=False))
+            fc[cols].itertuples(index=False))
+
+
+def forecast_frame(conn: psycopg.Connection) -> pd.DataFrame:
+    """Every stored forecast with its actual value (NaN until the hour settles)."""
+    cur = conn.execute(
+        "SELECT f.ts_utc, f.target, f.model, f.issue_date, f.value, f.source, "
+        "CASE f.target WHEN 'pool_price' THEN h.pool_price WHEN 'load_mw' THEN h.load_mw END "
+        "FROM forecasts f LEFT JOIN hourly h USING (ts_utc)")
+    cols = ["ts_utc", "target", "model", "issue_date", "value", "source", "actual"]
+    df = pd.DataFrame(cur.fetchall(), columns=cols)
+    df["ts_utc"] = pd.to_datetime(df["ts_utc"], utc=True)
+    return df.astype({"value": float, "actual": float})

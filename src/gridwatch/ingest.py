@@ -72,7 +72,9 @@ def ingest(conn: psycopg.Connection, start: date, end: date) -> None:
             fuels = aeso.gen_capacity(cs.isoformat(), (ce + timedelta(days=1)).isoformat())
             db.upsert(conn, capacity_rows(fuels))
         for city in weather.CITIES:
-            db.upsert(conn, weather_rows(city, weather.history(city, a, b)))
+            if s <= date.today():  # the archive has no future dates
+                hb = min(e, date.today()).isoformat()
+                db.upsert(conn, weather_rows(city, weather.history(city, a, hb)))
             if e >= DAY_AHEAD_FROM:
                 fa = max(s, DAY_AHEAD_FROM).isoformat()
                 db.upsert(conn, weather_rows(city, weather.day_ahead(city, fa, b), "fc_"))

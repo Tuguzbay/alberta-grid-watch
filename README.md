@@ -30,6 +30,8 @@ python scripts/ingest.py        # daily update: re-fetches last 7 days (safe to 
 python scripts/backtest.py      # Phase 2 walk-forward backtest, rewrites Results below
 python scripts/cushion.py       # supply-cushion analysis, rewrites its README section
 python scripts/impacts.py       # emissions/water arithmetic, rewrites its README section
+python scripts/daily.py         # 10:00 MT daily: ingest + forecast tomorrow (safe to rerun)
+# model-health page: http://localhost:8000/  (JSON: /api/health)
 ```
 
 ## Architecture
@@ -39,12 +41,12 @@ _TODO (Phase 6): diagram._
 <!-- results:start -->
 Next-day forecasts issued 10:00 MT on D-1, monthly walk-forward, 2025-01-01 to 2026-10-16 (UTC). Test hours use day-ahead *forecast* weather only. Regenerate with `python scripts/backtest.py`.
 
-**load_mw** (MW), 15,688 hours
+**load_mw** (MW), 15,689 hours
 
 | model | MAE | RMSE | MAPE % |
 |---|---:|---:|---:|
 | hgb | 158.8 | 205.6 | 1.5 |
-| two_days_ago | 300.1 | 390.4 | 2.9 |
+| two_days_ago | 300.0 | 390.3 | 2.9 |
 | last_week | 316.6 | 409.8 | 3.0 |
 
 **pool_price** ($/MWh), 15,688 hours
