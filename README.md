@@ -4,6 +4,8 @@ A public tool that uses real data to answer what large new loads, like proposed 
 
 > Scenario outputs are **illustrative**, not predictions, and nothing here attributes a causal price impact to any specific project.
 
+Status and next steps: [PROGRESS.md](PROGRESS.md).
+
 ## Parts
 1. **Pool price & demand forecasting**: next-day hourly forecasts compared against simple baselines, with a public model-health page. *(Phases 1–3)*
 2. **RAG assistant**: cited answers drawn from AESO, AUC and Government of Alberta documents. It abstains when the documents don't cover a question. *(Phase 4)*
@@ -32,6 +34,7 @@ python scripts/cushion.py       # supply-cushion analysis, rewrites its README s
 python scripts/impacts.py       # emissions/water arithmetic, rewrites its README section
 python scripts/daily.py         # 10:00 MT daily: ingest + forecast tomorrow (safe to rerun)
 # model-health page: http://localhost:8000/  (JSON: /api/health)
+powershell -File scripts/register_task.ps1   # Windows: run daily.py at 10:00 automatically
 ```
 
 ## Architecture
