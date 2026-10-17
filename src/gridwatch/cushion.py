@@ -8,6 +8,10 @@ Illustrative only: an empirical price-vs-headroom curve, not a market model.
 
 import pandas as pd
 
+# Public reference points, not any one project: AESO interim large-load allocation (1,200 MW)
+# and the bridging allowance to draw from the grid while own generation is built (1,600 MW).
+SCENARIOS = {500: "smaller reference point", 1200: "AESO interim large-load allocation",
+             1600: "bridging allowance from the grid"}
 BIN_MW = 250
 SPIKE = 200  # $/MWh
 

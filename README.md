@@ -29,6 +29,7 @@ python scripts/ingest.py --start 2020-01-01   # backfill `hourly` (~1 min), prin
 python scripts/ingest.py        # daily update: re-fetches last 7 days (safe to rerun)
 python scripts/backtest.py      # Phase 2 walk-forward backtest, rewrites Results below
 python scripts/cushion.py       # supply-cushion analysis, rewrites its README section
+python scripts/impacts.py       # emissions/water arithmetic, rewrites its README section
 ```
 
 ## Architecture
@@ -91,3 +92,24 @@ Hourly data 2025-01-01 to 2026-10-17, 15,695 hours. **Headroom** = available dis
 
 Not a forecast and not about any one project. It reads prices off the observed price-vs-headroom relationship, which is a correlation: low-headroom hours are also high-demand, often cold hours. It assumes nothing else changes: no new generation (Alberta's policy expects data centres to bring their own), no change in imports, wind, solar, or how generators offer. Hours pushed below the lowest well-observed headroom (3,308 in the largest case) are priced at that edge, so the price impact is understated there.
 <!-- cushion:end -->
+
+## Emissions and water: if the added load runs on new gas generation
+<!-- impacts:start -->
+Context from our data: Alberta used **90.4 TWh** in 2025; the record hourly load is **12,785 MW** (2025-12-11 17:00 MT). Each row assumes the load runs flat all year (an upper bound; real data centres run close to flat) and every MWh comes from new combined-cycle gas at Alberta's best-gas benchmark (a lower bound on emissions; simple-cycle plants emit more). Regenerate with `python scripts/impacts.py`.
+
+| added load | reference | TWh/yr | % of AB use | CO₂ Mt/yr | % of AB power CO₂ (2023) | plant water, cooling tower (billion L/yr) | ≈ Albertans' water use | dry cooling (billion L/yr) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 500 MW | smaller reference point | 4.4 | 5% | 1.6 | 8% | 2.2–5.0 | 18,000–41,000 people | 0.00–0.07 |
+| 1,200 MW | AESO interim large-load allocation | 10.5 | 12% | 3.9 | 20% | 5.2–11.9 | 43,000–99,000 people | 0.00–0.16 |
+| 1,600 MW | bridging allowance from the grid | 14.0 | 16% | 5.2 | 27% | 6.9–15.9 | 57,000–132,000 people | 0.00–0.21 |
+| 20,000 MW | all proposals reported (~20 GW) | 175.2 | 194% | 64.8 | 338% | 86.2–198.9 | 716,000–1,652,000 people | 0.00–2.65 |
+
+The ~20 GW of proposals is **1.6×** Alberta's record peak load. Water is the gas plant's cooling consumption only; data-centre cooling is extra and depends on design (the province's "less than a golf course" figure refers to the data centre, not its power plant). The MW references only set the size: grid power drawn under the bridging allowance would come from today's mix, not new CCGT.
+
+Sources:
+- CO2 0.37 t/MWh: Alberta TIER regulation, electricity high-performance benchmark
+- Water gal/MWh: Macknick et al. 2012, Environ. Res. Lett. 7 045802 (NREL)
+- AB electricity 19.2 Mt (2023): Canada National Inventory Report 2025
+- 330 L/person/day: Statistics Canada, Survey of Drinking Water Plants 2021
+- ~20 GW proposed: National Observer (2026-03-23) and DeSmog (2026-07-23) reporting
+<!-- impacts:end -->

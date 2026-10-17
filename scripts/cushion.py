@@ -6,16 +6,12 @@ Run: python scripts/cushion.py   (needs DATABASE_URL and a loaded `hourly` table
 from gridwatch import cushion, db, readme
 
 SINCE = "2025-01-01"  # recent market regime; 2022-23 gas prices make older hours a different curve
-# Public reference points, not any one project: AESO interim large-load allocation (1,200 MW)
-# and the bridging allowance to draw from the grid while own generation is built (1,600 MW).
-SCENARIOS = {500: "smaller reference point", 1200: "AESO interim large-load allocation",
-             1600: "bridging allowance from the grid"}
 
 with db.connect() as conn:
     df = db.hourly_frame(conn)[SINCE:]
 h, price = cushion.headroom(df), df["pool_price"]
 coarse = cushion.curve(h, price, bin_mw=1000)
-runs = [cushion.scenario(h, price, mw) for mw in SCENARIOS]
+runs = [cushion.scenario(h, price, mw) for mw in cushion.SCENARIOS]
 print(coarse.round(2).to_string())
 for r in runs:
     print(r)
@@ -36,7 +32,7 @@ lines += [
     "expected hours > $200 |", "|---|---|---:|---:|---:|",
     f"| none | today | {runs[0]['hours_below_zero_today']:,} | "
     f"${runs[0]['curve_mean_price_base']:.0f} | {runs[0]['expected_spike_hours_base']:,.0f} |"]
-lines += [f"| {r['added_mw']:,} MW | {SCENARIOS[r['added_mw']]} | "
+lines += [f"| {r['added_mw']:,} MW | {cushion.SCENARIOS[r['added_mw']]} | "
           f"{r['hours_headroom_below_zero']:,} | ${r['curve_mean_price_new']:.0f} | "
           f"{r['expected_spike_hours_new']:,.0f} |" for r in runs]
 lines += ["", "Not a forecast and not about any one project. It reads prices off the observed "
