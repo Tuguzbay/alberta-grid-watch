@@ -1,6 +1,6 @@
 # Progress & next steps
 
-_Last updated: 2026-10-16._ This is the hand-off file: read it first when resuming.
+_Last updated: 2026-10-17._ This is the hand-off file: read it first when resuming.
 
 ## Status
 
@@ -10,8 +10,8 @@ _Last updated: 2026-10-16._ This is the hand-off file: read it first when resumi
 | 1 | `hourly` table, backfill + daily ingest, quality report | ✅ done |
 | 2 | Next-day price/load forecasts vs baselines; supply cushion; emissions & water | ✅ done |
 | 3 | Live daily forecasts, model-health page (`/`, `/api/health`), scheduled task | ✅ done |
-| 4 | RAG assistant over AESO / AUC / Government of Alberta documents | ⏭ next |
-| 5 | Bill & scenario simulator (clearly hypothetical) | ⬜ |
+| 4 | Document search (extractive RAG) over AESO / AUC / GoA documents, `/api/ask` | ✅ built, awaiting your sign-off |
+| 5 | Bill & scenario simulator (clearly hypothetical) | ⏭ next |
 | 6 | Deploy: Supabase, hosted API, GitHub Actions schedule, architecture diagram | ⬜ |
 
 Repo: https://github.com/Tuguzbay/alberta-grid-watch (public). Push over HTTPS (Git Credential Manager); there's no SSH key on this PC.
@@ -34,11 +34,13 @@ Repo: https://github.com/Tuguzbay/alberta-grid-watch (public). Push over HTTPS (
 ### Housekeeping (quick)
 - [ ] After ~2 weeks of live runs: add an "AESO day-ahead (frozen at 10:00)" row to the load comparison. `daily.py` stores it as model `aeso`, source `live`.
 
-### Phase 4: RAG assistant
-- [ ] Pick the document set (AESO large-load / interim connection policy, AUC decisions, GoA data-centre pages and regulations) and record the source URL and date for each.
-- [ ] Ingest: download → chunk → embed → pgvector table (`documents`, `chunks`). Choose the embedding model (local vs API) and note its cost.
-- [ ] Answer endpoint: retrieve → answer **only** from retrieved chunks with citations; abstain when nothing relevant clears a score threshold.
-- [ ] Eval set: ~30 questions with expected sources, including ones the documents don't answer (must abstain). Report citation accuracy and abstention rate.
+### Phase 4: document search (done 2026-10-17)
+- [x] 17 documents in `rag/sources.csv` (7 AESO/AUC, 10 GoA/legislature), each URL checked. Raw copies are in `data/rag/` (gitignored).
+- [x] `scripts/rag_ingest.py`: fetch → chunk (200 words, 40 overlap, per page) → local fastembed `bge-small-en-v1.5` (free) → `documents` / `chunks` tables. 313 chunks.
+- [x] `POST /api/ask` returns extracted passages plus source/page, or abstains below cosine 0.70. No LLM, chosen 2026-10-17, so there's nothing to hallucinate and no API cost.
+- [x] `rag/eval.jsonl` (34 questions) + `scripts/rag_eval.py`: 23/27 right source, 6/7 abstentions correct. Tuned in-sample; caveats are in the README.
+- [ ] Possible next steps: hybrid keyword + vector search (names like "Olds"/"Synapse" are missed when reworded); a fresh held-out question set; an `/ask` box on the page; refresh docs on a schedule (`rag_ingest.py` skips unchanged files).
+- Missing from the corpus: the final levy law (Bill 12, Financial Statutes Amendment Act (No. 2), 2025). The levy engagement page is the July 2025 consultation.
 
 ### Phase 5: bill & scenario simulator
 - [ ] Bill: energy (pool-price pass-through) + transmission + distribution + riders for a typical ~600 kWh/month household; cite the rate sources.
@@ -58,4 +60,5 @@ Repo: https://github.com/Tuguzbay/alberta-grid-watch (public). Push over HTTPS (
 - **Supply cushion:** it ignores wind, solar and imports, and it's a correlation, not causation.
 - **Impacts:** they're an upper bound on energy (flat load) and a lower bound on emissions (best-gas factor).
 - **Reruns of `daily.py`:** a rerun after 10:00 retrains on the extra settled hours and replaces that day's live forecast. Features still respect the 10:00 cutoff.
+- **Document search:** it's extractive and the threshold was tuned in-sample. A high score means the topic matches, not that the answer is in the passage. GoA datacentres pages are advocacy.
 - **AESO API limits:** 366 days per request, capacity data in 30-day chunks, metered volume ~17 days. AESO data terms are non-commercial/educational.

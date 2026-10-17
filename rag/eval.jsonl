@@ -1,0 +1,34 @@
+{"q": "How many megawatts was the AESO's interim large load connection limit?", "sources": ["aeso_factsheet", "aeso_update_2025_09", "aeso_role", "aeso_byog", "goa_grid", "goa_bills"]}
+{"q": "How large is the City of Edmonton's electricity load?", "sources": ["aeso_factsheet"]}
+{"q": "How much data centre load was on the AESO project list in September 2025?", "sources": ["aeso_update_2025_09"]}
+{"q": "How many projects and developers qualified in Phase I of large load integration?", "sources": ["aeso_update_2025_09"]}
+{"q": "Why was the Phase I load contract execution deadline extended?", "sources": ["aeso_update_2025_09"]}
+{"q": "Does the Alberta Utilities Commission approve data centres?", "sources": ["auc_factsheet", "aeso_role"]}
+{"q": "How can members of the public take part in an AUC review of a power plant?", "sources": ["auc_factsheet", "goa_have_say"]}
+{"q": "Why did the AUC deny the Synapse power plant in Olds?", "sources": ["auc_synapse"]}
+{"q": "How many residences are within 800 metres of the Synapse project site?", "sources": ["auc_synapse"]}
+{"q": "How much backup diesel generation did Synapse propose?", "sources": ["auc_synapse"]}
+{"q": "What is a tethered data centre?", "sources": ["goa_regulation"]}
+{"q": "What maximum demand makes a data centre a large data centre under the regulation?", "sources": ["goa_regulation", "aeso_role"]}
+{"q": "When does the Data Centre Regulation expire?", "sources": ["goa_regulation"]}
+{"q": "When did the Utilities Statutes Amendment Act, 2025 receive royal assent?", "sources": ["goa_pathways"]}
+{"q": "Who pays for transmission upgrades needed to connect a data centre?", "sources": ["goa_pathways", "goa_bills"]}
+{"q": "How much will Meta pay in transmission fees each year?", "sources": ["goa_bills"]}
+{"q": "By how much is the transmission portion of household bills expected to drop?", "sources": ["goa_bills"]}
+{"q": "What is Alberta's record peak electricity demand?", "sources": ["goa_grid"]}
+{"q": "How much water does an evaporative cooling tower use per megawatt per year?", "sources": ["goa_water"]}
+{"q": "Which southern Alberta river basins are closed to new water licences?", "sources": ["goa_water"]}
+{"q": "What ramp rate does the AESO allow for a transmission-connected data centre?", "sources": ["aeso_connection_guide"]}
+{"q": "When will application intake for the bring-your-own-generation process begin?", "sources": ["aeso_byog"]}
+{"q": "What levy options did the government consult on for data centres?", "sources": ["goa_levy"]}
+{"q": "What percentage levy do large data centres pay on their computing equipment?", "sources": ["goa_hub"]}
+{"q": "Who builds and maintains transmission facilities for an approved data centre connection?", "sources": ["aeso_role"]}
+{"q": "Why did the AUC reject the Olds power plant?", "sources": ["auc_synapse"]}
+{"q": "How much will my power bill go up?", "sources": ["goa_bills"]}
+{"q": "What is the best recipe for sourdough bread?", "sources": []}
+{"q": "Who won the 2026 Stanley Cup?", "sources": []}
+{"q": "How do I renew my Alberta driver's licence?", "sources": []}
+{"q": "What are the visa requirements for travelling to Japan?", "sources": []}
+{"q": "What is the AESO's total transmission revenue requirement for 2026?", "sources": []}
+{"q": "How many data centres operate in Quebec?", "sources": []}
+{"q": "What was the average Alberta pool price in 2025?", "sources": []}

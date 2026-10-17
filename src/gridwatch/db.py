@@ -31,6 +31,25 @@ CREATE TABLE IF NOT EXISTS forecasts (
     value double precision,
     source text NOT NULL DEFAULT 'backtest',  -- 'backtest' or 'live'
     PRIMARY KEY (ts_utc, target, model, source)
+);
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE IF NOT EXISTS documents (
+    key text PRIMARY KEY,  -- the key column in rag/sources.csv
+    publisher text NOT NULL,
+    title text NOT NULL,
+    published text,
+    url text NOT NULL,
+    retrieved_on date NOT NULL,
+    sha256 text NOT NULL
+);
+-- shortcut: no vector index, exact scan; fine for a few thousand chunks, add HNSW past that.
+CREATE TABLE IF NOT EXISTS chunks (
+    doc_key text NOT NULL REFERENCES documents ON DELETE CASCADE,
+    ord int NOT NULL,
+    page int,  -- PDF page (1-based); NULL for web pages
+    text text NOT NULL,
+    embedding vector(384) NOT NULL,
+    PRIMARY KEY (doc_key, ord)
 );"""
 
 

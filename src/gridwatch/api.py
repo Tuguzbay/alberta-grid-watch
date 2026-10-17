@@ -1,8 +1,9 @@
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
-from gridwatch import db, health, page
+from gridwatch import db, health, page, rag
 
 app = FastAPI(title="Alberta Grid & Data Centre Watch")
 
@@ -28,3 +29,14 @@ def model_health() -> dict:
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return page.render(load_summary())
+
+
+class Question(BaseModel):
+    q: str = Field(min_length=3, max_length=500)
+
+
+@app.post("/api/ask")
+def ask(body: Question) -> dict:
+    """Extracted passages from AESO/AUC/GoA documents with sources, or an abstention."""
+    with db.connect() as conn:
+        return rag.ask(conn, body.q)
