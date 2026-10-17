@@ -33,3 +33,10 @@ def internal_load(start: str, end: str) -> list[dict]:
     return _get("actualforecast-api/v1/load/albertaInternalLoad", start, end)[
         "Actual Forecast Report"
     ]
+
+
+def gen_capacity(start: str, end: str) -> list[dict]:
+    """Hourly max capability (MC), outages and available capability (AC) per fuel type.
+
+    Unlike the other reports, `end` is exclusive here and the range is capped at 31 days."""
+    return _get("aiesgencapacity-api/v1/AIESGenCapacity", start, end)

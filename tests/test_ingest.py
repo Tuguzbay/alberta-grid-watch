@@ -25,10 +25,23 @@ def test_price_rows_parse_blank_as_none():
 
 def test_weather_rows_suffix_city():
     h = {"time": ["2024-01-01T00:00"], "temperature_2m": [1.4], "relative_humidity_2m": [86],
-         "wind_speed_10m": [13.2], "cloud_cover": [100]}
-    assert ingest.weather_rows("calgary", h) == [{
-        "ts_utc": datetime(2024, 1, 1, tzinfo=UTC), "temp_calgary": 1.4, "rh_calgary": 86,
-        "wind_calgary": 13.2, "cloud_calgary": 100}]
+         "wind_speed_10m": [13.2], "cloud_cover": [100], "wind_speed_100m": [20.5],
+         "shortwave_radiation": [0.0]}
+    assert ingest.weather_rows("calgary", h, "fc_") == [{
+        "ts_utc": datetime(2024, 1, 1, tzinfo=UTC), "temp_fc_calgary": 1.4, "rh_fc_calgary": 86,
+        "wind_fc_calgary": 13.2, "cloud_fc_calgary": 100, "wind100_fc_calgary": 20.5,
+        "swrad_fc_calgary": 0.0}]
+
+
+def test_capacity_rows_split_renewables_from_dispatchable():
+    def fuel(name, mc, ac):
+        return {"fuel_type": name, "Hours": [{"begin_datetime_utc": "2025-06-01 06:00",
+                                              "outage_grouping": {"MC": mc, "AC": ac}}]}
+    fuels = [fuel("GAS", 6097, 3596), fuel("HYDRO", 899, 815), fuel("WIND", 5688, 5237),
+             fuel("SOLAR", 1825, 1782)]
+    assert ingest.capacity_rows(fuels) == [{"ts_utc": datetime(2025, 6, 1, 6, tzinfo=UTC),
+                                            "dispatchable_ac": 3596 + 815, "wind_mc": 5688,
+                                            "solar_mc": 1825}]
 
 
 @pytest.fixture
