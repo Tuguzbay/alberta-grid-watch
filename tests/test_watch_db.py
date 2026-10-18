@@ -152,3 +152,15 @@ def test_store_ignores_markup_only_changes(conn, monkeypatch):
     rag.store(conn, src, page.format("bbb").encode())
     rag.store(conn, src, page.format("ccc").encode())
     assert conn.execute("SELECT changed_on FROM documents WHERE key = 'm'").fetchone()[0] is None
+
+
+def test_store_backfills_text_sha_for_unchanged_files(conn, monkeypatch):
+    monkeypatch.setattr(rag, "_model", lambda: Obj(
+        passage_embed=lambda texts: [np.zeros(384) for _ in texts]))
+    src = {"key": "b", "publisher": "P", "title": "T", "published": "", "url": "https://x.ca/b"}
+    rag.store(conn, src, b"<p>first version</p>")
+    conn.execute("UPDATE documents SET text_sha = NULL WHERE key = 'b'")  # a pre-upgrade row
+    rag.store(conn, src, b"<p>first version</p>")  # unchanged file: fingerprint filled in
+    assert conn.execute("SELECT text_sha FROM documents WHERE key = 'b'").fetchone()[0]
+    rag.store(conn, src, b"<p>second version</p>")  # so a later real edit is detected
+    assert conn.execute("SELECT changed_on FROM documents WHERE key = 'b'").fetchone()[0]

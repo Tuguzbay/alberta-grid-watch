@@ -115,6 +115,8 @@ def store(conn: psycopg.Connection, src: dict, content: bytes, force: bool = Fal
     row = conn.execute("SELECT sha256, changed_on, text_sha FROM documents WHERE key = %s",
                        (src["key"],)).fetchone()
     if row and sha == row[0] or row and tsha == row[2]:  # same file, or same visible text
+        if row[2] is None:  # rows stored before text fingerprints: fill it in now
+            conn.execute("UPDATE documents SET text_sha = %s WHERE key = %s", (tsha, src["key"]))
         if not force:
             return None
     # Only a different visible text, compared with a known earlier fingerprint, is a change.
