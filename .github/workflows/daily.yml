@@ -1,0 +1,65 @@
+# Daily: ingest + forecast (scripts/daily.py), rebuild the claims page, commit the snapshot,
+# deploy to GitHub Pages. Two crons so one lands at 10:05 Mountain time in summer and winter;
+# scripts/should_run.py makes the other a no-op.
+name: Daily
+on:
+  schedule:
+    - cron: "5 16 * * *"
+    - cron: "5 17 * * *"
+  workflow_dispatch:
+concurrency: daily
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions: { contents: write, actions: write }
+    env:
+      PYTHONTZPATH: ""  # use the tzdata package, not the runner's possibly older system zoneinfo
+      AESO_API_KEY: ${{ secrets.AESO_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    outputs:
+      run: ${{ steps.guard.outputs.run }}
+      daily: ${{ steps.daily.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -e .  # editable: site.py reads rag/sources.csv from the checkout
+      - id: guard
+        run: python scripts/should_run.py ${{ github.event_name == 'workflow_dispatch' && '--manual' || '' }}
+      # A failed ingest still rebuilds the page from the last good data (it shows a stale
+      # warning); the deploy job fails afterwards so GitHub emails about it.
+      - id: daily
+        if: steps.guard.outputs.run == 'true'
+        continue-on-error: true
+        run: python scripts/daily.py
+      - if: steps.guard.outputs.run == 'true'
+        run: python scripts/build_site.py
+      - name: Commit snapshot (keeps the repo active for GitHub's 60-day schedule rule)
+        if: steps.guard.outputs.run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshots
+          git diff --cached --quiet || { git commit -m "snapshot $(TZ=America/Edmonton date +%F)" && git push; }
+      - name: Re-enable this workflow (belt and braces for the 60-day rule)
+        if: steps.guard.outputs.run == 'true'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh workflow enable daily.yml
+      - if: steps.guard.outputs.run == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+  deploy:
+    needs: build
+    if: needs.build.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    permissions: { pages: write, id-token: write }
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Fail the run if the data update failed
+        if: needs.build.outputs.daily == 'failure'
+        run: echo "scripts/daily.py failed; page rebuilt from older data" && exit 1

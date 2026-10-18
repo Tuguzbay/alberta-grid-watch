@@ -39,7 +39,8 @@ Document search on the page, the bill simulator (old Phase 5), and a before/afte
 ## Architecture
 
 ```
-GitHub Actions (daily.yml, cron 16:00 + 17:00 UTC, guard: run only at 10:00 America/Edmonton)
+GitHub Actions (daily.yml, cron 16:05 + 17:05 UTC, guard: on/after 10:00 America/Edmonton
+                and no live forecast issued today, or a manual run)
   1. scripts/daily.py          ingest + forecast → Supabase (unchanged)
   2. scripts/build_site.py     Supabase → site/index.html, site/health.html, site/data.json
   3. commit snapshots/YYYY-MM-DD.json   (card numbers; keeps the repo active)
