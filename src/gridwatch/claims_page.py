@@ -15,9 +15,8 @@ from gridwatch.features import TZ
 from gridwatch.health import STALE_HOURS
 
 REPO = "https://github.com/Tuguzbay/alberta-grid-watch"
-FONTS = ("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700..900;"
-         "1,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Figtree:wght@"
-         "400;600;700;800&display=swap")
+FONTS = ("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;"
+         "0,6..72,600;0,6..72,800;1,6..72,500&family=Figtree:wght@400;600;700;800&display=swap")
 # Newsprint grain: a tiny SVG noise tile at ~7% opacity.
 GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E"
          "%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'"
@@ -28,6 +27,14 @@ GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16
 TONE = {"Not so far": "good", "Plausible": "good", "Small": "good",
         "More hours leaning on wind, solar and imports": "warn", "Overstated": "warn",
         "Significant": "warn"}
+DARK = """--paper:#121110; --sheet:#1b1a18; --ink:#efe9dc; --ink-2:#bbb4a5; --rule:#3a3631;
+    --accent:#7aa3ff; --accent-soft:#1d2a46; --shadow:#0009;
+    --good:#86dba6; --good-bg:#16352a; --warn:#ffc47e; --warn-bg:#3d2a12;
+    --neutral:#cdd2da; --neutral-bg:#2c3038; color-scheme:dark;"""
+SUN = ("<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='4.5'/><path d='M12 "
+       "1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3"
+       " 6.7l2.1-2.1'/></svg>")
+MOON = "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z'/></svg>"  # noqa: E501
 
 
 def _split(text: str) -> tuple[str, str]:
@@ -80,18 +87,19 @@ def _card(i: int, c: dict, sources: dict[str, dict]) -> str:
              if c["chart"] else "")
     how = "".join(f"<li>{escape(x)}</li>" for x in c["how"])
     rest_p = f"<p>{escape(rest)}</p>" if rest else ""
-    return f"""<article id="{escape(c['id'])}" class="story">
+    return f"""<article id="{escape(c['id'])}" class="story reveal">
 <header><span class="num">{i:02d}</span><h2>{escape(c['question'])}</h2></header>
 <div class="cols">
   <div class="figure"><p class="big">{escape(c['headline'])}</p>{_chip(c['verdict'])}</div>
   <div class="text"><p class="lead">{escape(lead)}</p>{rest_p}</div>
 </div>
 {chart}
-<div class="fine">
-  <details><summary>How we know</summary><ul>{how}</ul></details>
-  <details><summary>Sources</summary><ul class="src">{_sources(c['sources'], sources)}</ul>
-  </details>
-</div>
+<details class="more"><summary>How we know &amp; sources</summary>
+  <div class="more-body">
+    <div><h3>Method and caveats</h3><ul>{how}</ul></div>
+    <div><h3>Sources</h3><ul class="src">{_sources(c['sources'], sources)}</ul></div>
+  </div>
+</details>
 </article>"""
 
 
@@ -111,31 +119,34 @@ def render(data: dict, sources: dict[str, dict]) -> str:
 <title>Meta in Alberta: claims vs data</title>
 <meta name="description" content="Worries and promises about Meta's Alberta data centre,
 checked against grid data. An independent project.">
+<script>
+// Before first paint: apply a saved theme choice and mark that scripts run (for scroll reveal).
+document.documentElement.classList.add("js");
+try {{
+  const t = localStorage.getItem("theme");
+  if (t) document.documentElement.dataset.theme = t;
+}} catch (e) {{}}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
 <style>
 :root {{
   --paper:#f3eee3; --sheet:#fbf8f1; --ink:#161513; --ink-2:#4a463f; --rule:#cfc6b4;
-  --accent:#0a5cff; --accent-soft:#e3ecff;
+  --accent:#0a5cff; --accent-soft:#e3ecff; --shadow:#0004;
   --good:#0f6b3a; --good-bg:#dff2e5; --warn:#8a4b00; --warn-bg:#fdebd0;
-  --neutral:#3d4450; --neutral-bg:#e6e8ec;
-  --head:"Playfair Display", "Didot", Georgia, serif; --body:"Source Serif 4", Georgia, serif;
-  --ui:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --neutral:#3d4450; --neutral-bg:#e6e8ec; color-scheme:light;
+  --serif:"Newsreader", Georgia, serif; --ui:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --ease:cubic-bezier(.2,.8,.2,1);
   --grain:url("{GRAIN}");
 }}
-@media (prefers-color-scheme: dark) {{
-  :root {{
-    --paper:#121110; --sheet:#1b1a18; --ink:#efe9dc; --ink-2:#bbb4a5; --rule:#3a3631;
-    --accent:#7aa3ff; --accent-soft:#1d2a46;
-    --good:#86dba6; --good-bg:#16352a; --warn:#ffc47e; --warn-bg:#3d2a12;
-    --neutral:#cdd2da; --neutral-bg:#2c3038;
-  }}
-}}
+@media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) {{ {DARK} }} }}
+:root[data-theme="dark"] {{ {DARK} }}
 * {{ box-sizing:border-box; }}
 html {{ scroll-behavior:smooth; }}
 body {{ margin:0; background:var(--paper) var(--grain); color:var(--ink);
-        font:18px/1.6 var(--body); -webkit-font-smoothing:antialiased; }}
+        font:400 19px/1.6 var(--serif); -webkit-font-smoothing:antialiased;
+        transition:background-color .4s var(--ease), color .4s var(--ease); }}
 .page {{ max-width:1040px; margin:0 auto; padding:0 16px 64px; }}
 a {{ color:var(--accent); text-underline-offset:3px; }}
 .kicker {{ font:700 .78rem/1 var(--ui); letter-spacing:.16em; text-transform:uppercase;
@@ -143,14 +154,23 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 
 /* Masthead: an old broadsheet's rules and edition line. */
 .masthead {{ text-align:center; padding:28px 0 0; }}
-.edition {{ display:flex; justify-content:space-between; gap:4px 12px; flex-wrap:wrap;
-            font:600 .74rem/1.4 var(--ui); letter-spacing:.08em; text-transform:uppercase;
-            color:var(--ink-2); border-top:3px double var(--ink);
-            border-bottom:1px solid var(--ink); padding:8px 2px; }}
-.masthead h1 {{ font:900 clamp(2.5rem, 9vw, 5.6rem)/.95 var(--head); letter-spacing:-.01em;
+.edition {{ display:flex; justify-content:space-between; align-items:center; gap:4px 12px;
+            flex-wrap:wrap; font:600 .74rem/1.4 var(--ui); letter-spacing:.08em;
+            text-transform:uppercase; color:var(--ink-2); border-top:3px double var(--ink);
+            border-bottom:1px solid var(--ink); padding:6px 2px; }}
+.theme {{ display:inline-flex; align-items:center; gap:8px; font:700 .74rem/1 var(--ui);
+          letter-spacing:.08em; text-transform:uppercase; color:var(--ink); cursor:pointer;
+          background:var(--sheet); border:1px solid var(--rule); border-radius:99px;
+          padding:6px 12px 6px 8px; transition:background .25s, transform .25s var(--ease); }}
+.theme:hover {{ transform:translateY(-1px); background:var(--accent-soft); }}
+.theme:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
+.theme svg {{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2;
+              stroke-linecap:round; transition:transform .5s var(--ease); }}
+.theme:hover svg {{ transform:rotate(25deg); }}
+.masthead h1 {{ font:800 clamp(2.5rem, 9vw, 5.4rem)/.98 var(--serif); letter-spacing:-.02em;
                 margin:22px 0 10px; }}
 .masthead h1 em {{ font-style:italic; font-weight:500; }}
-.dek {{ font:400 clamp(1.05rem, 2.4vw, 1.3rem)/1.5 var(--body); color:var(--ink-2);
+.dek {{ font:400 clamp(1.08rem, 2.4vw, 1.32rem)/1.5 var(--serif); color:var(--ink-2);
         max-width:640px; margin:0 auto 26px; }}
 .masthead .rule {{ border:0; border-top:1px solid var(--ink); border-bottom:3px double var(--ink);
                    height:5px; margin:0; }}
@@ -160,19 +180,23 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 /* Front page: at-a-glance beside how-big. */
 .front {{ display:grid; grid-template-columns:1fr; gap:22px; margin:30px 0 8px; }}
 @media (min-width:860px) {{ .front {{ grid-template-columns:1.05fr 1fr; }} }}
-.glance, .scale {{ background:var(--sheet); border:1px solid var(--rule); border-radius:22px;
-                   padding:22px; box-shadow:0 18px 40px -30px #0005; min-width:0; }}
+.glance, .scale, .chart {{ background:var(--sheet); border:1px solid var(--rule);
+  border-radius:22px; box-shadow:0 18px 40px -30px var(--shadow);
+  transition:transform .35s var(--ease), box-shadow .35s var(--ease), background-color .4s; }}
+.glance, .scale {{ padding:22px; min-width:0; }}
+.glance:hover, .scale:hover, .chart:hover {{ transform:translateY(-3px);
+  box-shadow:0 26px 50px -30px var(--shadow); }}
 .glance {{ display:flex; flex-direction:column; }}
 .glance ol {{ list-style:none; margin:0; padding:0; flex:1; display:flex; flex-direction:column;
               justify-content:space-around; }}
 .glance li + li {{ border-top:1px solid var(--rule); }}
 .glance a {{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; align-items:center;
              padding:14px 8px; color:var(--ink); text-decoration:none; border-radius:12px;
-             transition:background .2s; }}
-.glance a:hover, .glance a:focus-visible {{ background:var(--accent-soft); }}
-.glance .q {{ font:600 1.08rem/1.3 var(--ui); }}
+             transition:background .25s, padding .3s var(--ease); }}
+.glance a:hover, .glance a:focus-visible {{ background:var(--accent-soft); padding-left:14px; }}
+.glance .q {{ font:600 1.06rem/1.3 var(--ui); }}
 .glance .chip {{ grid-column:2; justify-self:start; }}
-.num {{ font:500 1rem/1 var(--head); font-style:italic; color:var(--ink-2); }}
+.num {{ font:italic 500 1.05rem/1 var(--serif); color:var(--ink-2); }}
 .glance .num {{ grid-row:span 2; align-self:start; padding-top:3px; }}
 
 .scale ul {{ list-style:none; margin:0; padding:0; display:grid; gap:16px; }}
@@ -185,7 +209,7 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
                position:relative; overflow:hidden; }}
 .scale .bar::after {{ content:""; position:absolute; inset:0 auto 0 0; width:var(--w);
                       min-width:6px; border-radius:99px; background:var(--accent);
-                      animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both .3s; }}
+                      animation:grow 1.2s var(--ease) both .35s; }}
 .scale li:first-child .bar::after {{ background:var(--ink); }}
 .note {{ font:400 .9rem/1.5 var(--ui); color:var(--ink-2); margin:18px 0 0; }}
 
@@ -193,8 +217,9 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 .story {{ border-top:3px double var(--ink); padding:34px 0 30px; margin-top:34px;
           scroll-margin-top:12px; }}
 .story header {{ display:flex; align-items:baseline; gap:16px; margin-bottom:22px; }}
-.story header .num {{ font-size:1.5rem; }}
-.story h2 {{ font:800 clamp(1.8rem, 4.6vw, 2.9rem)/1.05 var(--head); margin:0; }}
+.story header .num {{ font-size:1.6rem; }}
+.story h2 {{ font:800 clamp(1.9rem, 4.6vw, 3rem)/1.05 var(--serif); letter-spacing:-.015em;
+             margin:0; }}
 .cols {{ display:grid; grid-template-columns:1fr; gap:22px; }}
 @media (min-width:860px) {{
   .cols {{ grid-template-columns:minmax(260px, .8fr) 1.2fr; gap:40px; }}
@@ -202,29 +227,45 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 }}
 .big {{ font:800 clamp(1.6rem, 4vw, 2.3rem)/1.12 var(--ui); letter-spacing:-.02em;
         margin:0 0 14px; font-variant-numeric:tabular-nums; }}
-.lead {{ font:600 1.2rem/1.5 var(--body); margin:0 0 12px; }}
-.lead::first-letter {{ font:900 3.4em/.8 var(--head); float:left; margin:.06em .08em 0 0; }}
+.lead {{ font:600 1.22rem/1.5 var(--serif); margin:0 0 12px; }}
+.lead::first-letter {{ font:800 3.3em/.8 var(--serif); float:left; margin:.07em .08em 0 0; }}
 .text p:not(.lead) {{ color:var(--ink-2); margin:0; }}
 .chip {{ display:inline-flex; align-items:center; gap:8px; border-radius:99px; padding:6px 14px;
-         font:700 .86rem/1.25 var(--ui); }}
+         font:700 .86rem/1.25 var(--ui); transition:transform .25s var(--ease); }}
 .chip::before {{ content:""; flex:none; width:8px; height:8px; border-radius:50%;
                  background:currentColor; }}
 .good {{ color:var(--good); background:var(--good-bg); }}
 .warn {{ color:var(--warn); background:var(--warn-bg); }}
 .neutral {{ color:var(--neutral); background:var(--neutral-bg); }}
-.chart {{ margin:28px 0 0; background:var(--sheet); border:1px solid var(--rule);
-          border-radius:22px; padding:18px 14px 10px; }}
+.chart {{ margin:28px 0 0; padding:18px 14px 10px; }}
 /* Fixed-height box: Chart.js with maintainAspectRatio false sizes to its parent. */
 .chart .plot {{ position:relative; height:260px; }}
 .chart figcaption {{ font:600 .82rem/1.4 var(--ui); color:var(--ink-2); padding-top:6px; }}
-.fine {{ display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }}
-.fine details {{ flex:1 1 280px; background:var(--sheet); border:1px solid var(--rule);
-                 border-radius:16px; padding:0 16px; font:400 .95rem/1.5 var(--ui); }}
-.fine summary {{ cursor:pointer; font-weight:700; padding:12px 0; list-style:none; }}
-.fine summary::-webkit-details-marker {{ display:none; }}
-.fine summary::after {{ content:"+"; float:right; font-weight:400; }}
-.fine details[open] summary::after {{ content:"–"; }}
-.fine ul {{ margin:0 0 14px; padding-left:18px; color:var(--ink-2); }}
+
+/* One panel for method and sources; opens smoothly where the browser supports it. */
+.more {{ margin-top:20px; background:var(--sheet); border:1px solid var(--rule);
+         border-radius:18px; font:400 .95rem/1.55 var(--ui); interpolate-size:allow-keywords;
+         transition:border-color .3s; }}
+.more:hover {{ border-color:var(--accent); }}
+.more::details-content {{ block-size:0; overflow:hidden;
+  transition:block-size .45s var(--ease), content-visibility .45s allow-discrete; }}
+.more[open]::details-content {{ block-size:auto; }}
+.more summary {{ cursor:pointer; font-weight:700; padding:14px 18px; list-style:none;
+                 display:flex; justify-content:space-between; align-items:center;
+                 border-radius:18px; }}
+.more summary::-webkit-details-marker {{ display:none; }}
+.more summary:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
+.more summary::after {{ content:""; width:9px; height:9px; border-right:2px solid currentColor;
+  border-bottom:2px solid currentColor; transform:translateY(-3px) rotate(45deg);
+  transition:transform .35s var(--ease); }}
+.more[open] summary::after {{ transform:translateY(2px) rotate(225deg); }}
+.more-body {{ display:grid; grid-template-columns:1fr; gap:6px 32px; padding:0 18px 16px; }}
+@media (min-width:760px) {{ .more-body {{ grid-template-columns:1.3fr 1fr; }} }}
+.more[open] .more-body {{ animation:fade .45s var(--ease); }}
+.more h3 {{ font:700 .74rem/1 var(--ui); letter-spacing:.14em; text-transform:uppercase;
+            color:var(--ink-2); margin:6px 0 10px; }}
+.more ul {{ margin:0 0 8px; padding-left:18px; color:var(--ink-2); }}
+.more li + li {{ margin-top:6px; }}
 .src li span {{ display:block; font-size:.82rem; color:var(--ink-2); }}
 
 footer {{ border-top:3px double var(--ink); margin-top:20px; padding-top:18px;
@@ -234,19 +275,26 @@ footer p {{ margin:0 0 10px; break-inside:avoid; }}
 
 @keyframes grow {{ from {{ width:0; }} }}
 @keyframes rise {{ from {{ opacity:0; transform:translateY(14px); }} }}
-.masthead, .front > *, .story {{ animation:rise .7s cubic-bezier(.2,.8,.2,1) both; }}
+@keyframes fade {{ from {{ opacity:0; transform:translateY(-6px); }} }}
+.masthead, .front > * {{ animation:rise .8s var(--ease) both; }}
 .front > :nth-child(1) {{ animation-delay:.12s; }}
 .front > :nth-child(2) {{ animation-delay:.22s; }}
-.story {{ animation-delay:.3s; }}
+/* Scroll reveal: only once the script runs, so the page never hides content without it. */
+.js .reveal {{ opacity:0; transform:translateY(24px);
+               transition:opacity .8s var(--ease), transform .8s var(--ease); }}
+.js .reveal.in {{ opacity:1; transform:none; }}
 @media (prefers-reduced-motion: reduce) {{
   *, *::before, *::after {{ animation:none !important; transition:none !important; }}
+  .js .reveal {{ opacity:1; transform:none; }}
   html {{ scroll-behavior:auto; }}
 }}
 </style></head><body>
 <div class="page">
 <header class="masthead">
   <div class="edition"><span>Independent · Updated daily</span>
-    <span>Alberta grid edition</span><span>Data as of {escape(as_of_txt)} MT</span></div>
+    <span>Data as of {escape(as_of_txt)} MT</span>
+    <button class="theme" id="theme-toggle" type="button" aria-label="Switch to dark mode">
+      <span class="ico">{MOON}</span><span class="txt">Dark</span></button></div>
   <h1>Meta in Alberta: <em>claims vs data</em></h1>
   <p class="dek">Meta is building a large AI data centre in Sturgeon County. We check the
   worries people raise, and the promises the government makes, against Alberta grid data.</p>
@@ -270,29 +318,69 @@ footer p {{ margin:0 0 10px; break-inside:avoid; }}
 const asOf = Date.parse(document.querySelector("[data-as-of]").dataset.asOf);
 const live = document.getElementById("stale-live");
 if (live && Date.now() - asOf > {STALE_HOURS} * 3600e3) live.hidden = false;
+
+// Scroll reveal; without IntersectionObserver everything is shown at once.
+const items = document.querySelectorAll(".reveal");
+if ("IntersectionObserver" in window) {{
+  const io = new IntersectionObserver(es => es.forEach(e => {{
+    if (e.isIntersecting) {{ e.target.classList.add("in"); io.unobserve(e.target); }}
+  }}), {{rootMargin: "0px 0px -8% 0px"}});
+  items.forEach(el => io.observe(el));
+}} else items.forEach(el => el.classList.add("in"));
+
+// Theme switch: follows the system until the visitor picks, then remembers the pick.
+const root = document.documentElement, btn = document.getElementById("theme-toggle");
+const sun = {json.dumps(SUN)}, moon = {json.dumps(MOON)};
+const isDark = () => root.dataset.theme ? root.dataset.theme === "dark"
+  : matchMedia("(prefers-color-scheme: dark)").matches;
+function syncButton() {{
+  const dark = isDark();
+  btn.querySelector(".ico").innerHTML = dark ? sun : moon;
+  btn.querySelector(".txt").textContent = dark ? "Light" : "Dark";
+  btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+}}
+btn.addEventListener("click", () => {{
+  root.dataset.theme = isDark() ? "light" : "dark";
+  try {{ localStorage.setItem("theme", root.dataset.theme); }} catch (e) {{}}
+  syncButton(); drawCharts();
+}});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {{
+  if (!root.dataset.theme) {{ syncButton(); drawCharts(); }}
+}});
+syncButton();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const C = {charts};
-const css = getComputedStyle(document.documentElement);
-const v = name => css.getPropertyValue(name).trim();
-Chart.defaults.font.family = "Figtree, system-ui, sans-serif";
-Chart.defaults.color = v("--ink-2");
-for (const [id, c] of Object.entries(C)) {{
-  const el = document.getElementById("chart-" + id); if (!el) continue;
-  const box = document.createElement("div"); box.className = "plot";
-  el.replaceWith(box); box.appendChild(el);
-  new Chart(el, {{type: c.type, data: {{labels: c.labels,
-    datasets: Object.entries(c.series).map(([label, data]) => ({{label, data,
-      borderColor: v("--accent"),
-      backgroundColor: c.type === "bar" ? v("--accent") : v("--accent-soft"),
-      fill: c.type === "line" ? "origin" : false, tension: .25, borderWidth: 2,
-      borderRadius: 3, pointRadius: 0}}))}},
-    options: {{animation: false, maintainAspectRatio: false,
-      interaction: {{mode: "index", intersect: false}},
-      plugins: {{legend: {{display: false}}}},
-      scales: {{x: {{ticks: {{maxTicksLimit: box.clientWidth < 500 ? 4 : 7, maxRotation: 0}},
-                    grid: {{display: false}}}},
-                y: {{grid: {{color: v("--rule")}}, border: {{display: false}}}}}}}}}});
+const made = [];
+function drawCharts() {{
+  if (!window.Chart) return;
+  made.splice(0).forEach(ch => ch.destroy());
+  const css = getComputedStyle(root), v = name => css.getPropertyValue(name).trim();
+  Chart.defaults.font.family = "Figtree, system-ui, sans-serif";
+  Chart.defaults.color = v("--ink-2");
+  for (const [id, c] of Object.entries(C)) {{
+    const el = document.getElementById("chart-" + id); if (!el) continue;
+    let box = el.parentElement;
+    if (!box.classList.contains("plot")) {{
+      box = document.createElement("div"); box.className = "plot";
+      el.replaceWith(box); box.appendChild(el);
+    }}
+    made.push(new Chart(el, {{type: c.type, data: {{labels: c.labels,
+      datasets: Object.entries(c.series).map(([label, data]) => ({{label, data,
+        borderColor: v("--accent"),
+        backgroundColor: c.type === "bar" ? v("--accent") : v("--accent-soft"),
+        fill: c.type === "line" ? "origin" : false, tension: .25, borderWidth: 2,
+        borderRadius: 3, pointRadius: 0, pointHoverRadius: 5}}))}},
+      options: {{maintainAspectRatio: false,
+        animation: matchMedia("(prefers-reduced-motion: reduce)").matches ? false
+          : {{duration: 900, easing: "easeOutQuart"}},
+        interaction: {{mode: "index", intersect: false}},
+        plugins: {{legend: {{display: false}}}},
+        scales: {{x: {{ticks: {{maxTicksLimit: box.clientWidth < 500 ? 4 : 7, maxRotation: 0}},
+                      grid: {{display: false}}}},
+                  y: {{grid: {{color: v("--rule")}}, border: {{display: false}}}}}}}}}}));
+  }}
 }}
+drawCharts();
 </script></body></html>"""
