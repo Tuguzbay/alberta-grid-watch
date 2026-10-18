@@ -16,6 +16,8 @@ import psycopg
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ValidationError
 
+from gridwatch import rag
+
 MODEL = "claude-haiku-4-5"
 MAX_SEARCHES, MAX_ARTICLES, MAX_DOC_CHANGES = 3, 8, 3
 MAX_CHARS, MIN_WORDS, WINDOW_DAYS = 60_000, 150, 14
@@ -218,3 +220,79 @@ def changed_sources(conn: psycopg.Connection, since: date) -> list[dict]:
     cols = [d.name for d in cur.description]
     return [dict(zip(cols, r[:-1], strict=False)) | {"changed_on": r[-1].isoformat()}
             for r in cur.fetchall()]
+
+
+# --- daily run -----------------------------------------------------------------------------
+
+PRICE_IN, PRICE_OUT, PRICE_SEARCH = 1 / 1e6, 5 / 1e6, 0.01  # USD: Haiku 4.5, web search
+SLACK_DAYS = 2  # articles get indexed late; look a little before the last run (dedupe by URL)
+
+
+def article_text(content: bytes) -> str:
+    return "\n".join(t for _, t in rag.pages(content))
+
+
+def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
+        sources: list[dict] | None = None, raw_dir=None) -> dict:
+    """One claim-watch pass: changed official documents, then new articles. Returns a summary."""
+    fetch = fetch or rag.fetch
+    today = now.date()
+    s = dict.fromkeys(["candidates", "new_articles", "official_changed", "unreadable", "too_long",
+                       "extract_failed", "claims_saved", "quotes_rejected", "input_tokens",
+                       "output_tokens", "searches"], 0)
+
+    def add_usage(use: dict) -> None:
+        for k in ("input_tokens", "output_tokens", "searches"):
+            s[k] += use[k]
+
+    def process(url, title, outlet, published, kind, content=None):
+        status, kept = "ok", []
+        try:
+            content = content if content is not None else fetch(url)
+            text = article_text(content)
+        except Exception as e:  # a dead or odd page is recorded, never fatal
+            print(f"  unreadable {url}: {e}")
+            status, text = "unreadable", ""
+        if status == "ok" and len(text.split()) < MIN_WORDS:
+            status = "unreadable"
+        elif status == "ok" and len(text) > MAX_CHARS:
+            status = "too_long"  # never truncated: a partial article could lose context
+        if status == "ok":
+            try:
+                claims, use = extract(client, text, title, outlet)
+                add_usage(use)
+            except Exception as e:  # API errors: skip this article, keep the run going
+                print(f"  extract failed {url}: {e}")
+                claims = None
+            if claims is None:
+                status = "extract_failed"
+            else:
+                kept = [c for c in claims if quote_in_text(c.quote, text)]
+                s["quotes_rejected"] += len(claims) - len(kept)
+        if status != "ok":
+            s[status] += 1
+        save_article(conn, url, title, outlet, published, status, kind)
+        s["claims_saved"] += save_claims(conn, url, kept)
+        conn.commit()  # one article at a time: a later failure can't undo earlier work
+
+    if sources is not None:
+        changed = rag.ingest_all(conn, sources, raw_dir)
+        conn.commit()
+        for key in changed[:MAX_DOC_CHANGES]:
+            src = next(x for x in sources if x["key"] == key)
+            s["official_changed"] += 1
+            process(canonical_url(src["url"]) or src["url"], src["title"], src["publisher"],
+                    today, "official", (raw_dir / key).read_bytes())
+
+    last = last_run(conn)
+    since = last - timedelta(days=SLACK_DAYS) if last else today - timedelta(days=WINDOW_DAYS)
+    found, use = discover(client, since, today)
+    add_usage(use)
+    s["candidates"] = len(found)
+    for c in filter_candidates(found, seen_urls(conn), since, today):
+        s["new_articles"] += 1
+        process(c.url, c.title, c.outlet, c.published, "news")
+
+    s["est_cost_usd"] = round(s["input_tokens"] * PRICE_IN + s["output_tokens"] * PRICE_OUT
+                              + s["searches"] * PRICE_SEARCH, 4)
+    return s
