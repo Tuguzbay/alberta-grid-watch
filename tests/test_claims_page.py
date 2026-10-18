@@ -92,3 +92,25 @@ def test_short_answer_is_the_first_sentence():
     html = claims_page.render(data, SOURCES)
     assert '<p class="lead">First point.</p>' in html
     assert "Second point here." in html
+
+
+def test_method_and_sources_share_one_panel():
+    html = claims_page.render(DATA, SOURCES)
+    assert html.count("<details") == len(DATA["cards"])
+    assert html.count("How we know &amp; sources") == len(DATA["cards"])
+
+
+def test_theme_switch_overrides_system_setting():
+    html = claims_page.render(DATA, SOURCES)
+    assert 'id="theme-toggle"' in html and 'aria-label="Switch to dark mode"' in html
+    assert ':root[data-theme="dark"]' in html and ':root:not([data-theme="light"])' in html
+
+
+def test_scroll_reveal_never_hides_content_without_js():
+    # Sections only start hidden once the script has marked the page with the js class.
+    html = claims_page.render(DATA, SOURCES)
+    assert ".js .reveal" in html and "\n.reveal {" not in html
+
+
+def test_uses_newsreader():
+    assert "family=Newsreader" in claims_page.render(DATA, SOURCES)
