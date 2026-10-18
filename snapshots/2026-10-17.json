@@ -1,0 +1,33 @@
+{
+ "as_of_utc": "2026-10-18T00:00:00+00:00",
+ "scale": {
+  "meta_mw": 970,
+  "edmonton_mw": 1400,
+  "requested_mw": 19565,
+  "record_mw": 12785.0,
+  "record_ts_local": "2025-12-11 17:00",
+  "history_from": 2020
+ },
+ "cards": [
+  {
+   "id": "reliability",
+   "headline": "586 hours in 2026 when gas, hydro and storage alone fell short",
+   "verdict": "More hours leaning on wind, solar and imports"
+  },
+  {
+   "id": "bills",
+   "headline": "$35/MWh over the last year, down 21% on the year before",
+   "verdict": "Plausible"
+  },
+  {
+   "id": "emissions",
+   "headline": "Up to 3.1 Mt CO\u2082 a year if it all ran on gas",
+   "verdict": "Significant"
+  },
+  {
+   "id": "water",
+   "headline": "4.2\u20139.6 billion litres a year",
+   "verdict": "Depends on the plant's cooling"
+  }
+ ]
+}
