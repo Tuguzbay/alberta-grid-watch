@@ -11,6 +11,7 @@ jobs:
         options: --health-cmd pg_isready --health-interval 2s --health-retries 15
     env:
       DATABASE_URL: postgresql://gridwatch:gridwatch@localhost:5432/gridwatch
+      PYTHONTZPATH: ""  # use the tzdata package, not the runner's possibly older system zoneinfo
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

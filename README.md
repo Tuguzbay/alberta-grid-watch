@@ -8,7 +8,7 @@ Status and next steps: [PROGRESS.md](PROGRESS.md).
 
 ## Parts
 1. **Pool price & demand forecasting**: next-day hourly forecasts compared against simple baselines, with a public model-health page. *(Phases 1–3)*
-2. **RAG assistant**: cited answers drawn from AESO, AUC and Government of Alberta documents. It abstains when the documents don't cover a question. *(Phase 4)*
+2. **Document search**: ask a question and get the best-matching passages from 17 AESO, AUC and Government of Alberta documents, each with its source and page. It's extractive (no generated text) and abstains when nothing matches well enough. *(Phase 4)*
 3. **Bill & scenario simulator**: clearly labelled as hypothetical. *(Phase 5)*
 
 ## Data sources
@@ -16,6 +16,7 @@ Status and next steps: [PROGRESS.md](PROGRESS.md).
 |---|---|---|
 | [AESO public API](https://developer-apim.aeso.ca/) | pool price, Alberta Internal Load | free key; non-commercial/educational use |
 | [Open-Meteo](https://open-meteo.com/) | hourly weather, Edmonton & Calgary | free, non-commercial, CC BY 4.0, <10k calls/day |
+| AESO / AUC / GoA documents ([rag/sources.csv](rag/sources.csv)) | document search | public documents; quoted with source links |
 
 ## Dev setup
 ```bash
@@ -34,6 +35,9 @@ python scripts/cushion.py       # supply-cushion analysis, rewrites its README s
 python scripts/impacts.py       # emissions/water arithmetic, rewrites its README section
 python scripts/daily.py         # 10:00 MT daily: ingest + forecast tomorrow (safe to rerun)
 # model-health page: http://localhost:8000/  (JSON: /api/health)
+python scripts/rag_ingest.py    # fetch, chunk, embed rag/sources.csv (--force after chunking changes)
+python scripts/rag_eval.py      # retrieval eval + abstention threshold sweep
+curl -X POST localhost:8000/api/ask -H 'content-type: application/json' -d '{"q":"What is a tethered data centre?"}'
 powershell -File scripts/register_task.ps1   # Windows: run daily.py at 10:00 automatically
 ```
 
@@ -118,3 +122,18 @@ Sources:
 - 330 L/person/day: Statistics Canada, Survey of Drinking Water Plants 2021
 - ~20 GW proposed: National Observer (2026-03-23) and DeSmog (2026-07-23) reporting
 <!-- impacts:end -->
+
+## Document search: how well it works
+Local embeddings (`BAAI/bge-small-en-v1.5` via fastembed, free, CPU), 313 chunks of about 200 words, cosine search in pgvector. [rag/eval.jsonl](rag/eval.jsonl) has 34 questions: 27 the documents answer and 7 they don't (4 off-topic, 3 on-topic but not covered).
+
+| Threshold | Answerable: right source returned | Unanswerable: abstained |
+|---|---|---|
+| 0.68 | 24/27 | 4/7 |
+| **0.70 (used)** | **23/27** | **6/7** |
+| 0.72 | 22/27 | 6/7 |
+
+Caveats:
+- **Tuned in-sample.** The threshold was picked on these same 34 questions, so expect worse on new ones. The scores are tightly bunched, so rewording a question can drop it under the line. "Why did the AUC *reject* the Olds power plant?" scores 0.674 and gets abstained on, while "...*deny* the Synapse power plant in Olds?" scores 0.768.
+- **Similarity measures topic, not whether the answer is there.** "What is the AESO's total transmission revenue requirement for 2026?" isn't answered by any document, but it scores 0.77 against the connection guide, so the search returns off-target passages instead of abstaining. Read the passage before you trust it.
+- **Some sources are advocacy.** The Government of Alberta datacentres pages are written to persuade (for example, "Not one dollar ... is charged to your household"). Every passage shows its publisher, so you can weigh it.
+
