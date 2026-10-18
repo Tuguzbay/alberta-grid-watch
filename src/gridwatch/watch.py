@@ -6,7 +6,10 @@ Haiku extracts and categorises; it never judges whether a claim is true.
 """
 
 import hashlib
+import ipaddress
+import json
 import re
+import socket
 import unicodedata
 from datetime import date, datetime, timedelta
 from typing import Literal
@@ -65,7 +68,9 @@ def normalize(s: str) -> str:
 
 def quote_in_text(quote: str, text: str) -> bool:
     q = normalize(quote)
-    return len(q.split()) >= MIN_QUOTE_WORDS and q in normalize(text)
+    # Whole words only: "likely to raise bills" must not match inside "unlikely to raise bills".
+    return (len(q.split()) >= MIN_QUOTE_WORDS
+            and re.search(rf"(?<!\w){re.escape(q)}(?!\w)", normalize(text)) is not None)
 
 
 _TRACKING = re.compile(r"^(utm_.*|fbclid|gclid)$")
@@ -78,6 +83,16 @@ def canonical_url(url: str) -> str | None:
     query = urlencode([(k, v) for k, v in parse_qsl(p.query, keep_blank_values=True)
                        if not _TRACKING.match(k)])
     return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/"), query, ""))
+
+
+def public_host(url: str) -> bool:
+    """True if every address the URL's host resolves to is public (no internal/metadata hosts)."""
+    host = urlsplit(url).hostname
+    try:
+        infos = socket.getaddrinfo(host, None) if host else []
+    except OSError:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
 
 
 def filter_candidates(cands: list[Candidate], seen: set[str], since: date, today: date,
@@ -149,9 +164,15 @@ def discover(client, since: date, today: date) -> tuple[list[Candidate], dict]:
     # The answer is meant to be bare JSON; tolerate prose or code fences around it.
     start, end = text.find("{"), text.rfind("}")
     try:
-        found = Discovery.model_validate_json(text[start:end + 1]).articles if start >= 0 else []
-    except ValidationError:
-        found = []
+        items = json.loads(text[start:end + 1]).get("articles", []) if start >= 0 else []
+    except (ValueError, AttributeError):
+        items = []
+    found = []
+    for item in items if isinstance(items, list) else []:
+        try:  # one malformed item (e.g. a bad date) mustn't cost the whole day's results
+            found.append(Candidate.model_validate(item))
+        except ValidationError:
+            pass
     return found, _usage(resp)
 
 
@@ -217,6 +238,21 @@ def recent_claims(conn: psycopg.Connection, since: datetime, hidden: set[str]) -
     return [r for r in rows if r["id"] not in hidden]
 
 
+def pending_documents(conn: psycopg.Connection, since: date) -> list[dict]:
+    """Documents that changed since `since` and whose new text hasn't been extracted yet."""
+    cur = conn.execute("SELECT key, url, title, publisher, changed_on FROM documents"
+                       " WHERE changed_on >= %s ORDER BY changed_on, key", (since,))
+    out = []
+    for key, url, title, publisher, changed_on in cur.fetchall():
+        done = conn.execute(
+            "SELECT 1 FROM articles WHERE url = %s AND status = 'ok'"
+            " AND (fetched_at AT TIME ZONE 'UTC')::date >= %s",
+            (canonical_url(url) or url, changed_on)).fetchone()
+        if not done:
+            out.append({"key": key, "url": url, "title": title, "publisher": publisher})
+    return out
+
+
 def changed_sources(conn: psycopg.Connection, since: date) -> list[dict]:
     cur = conn.execute("SELECT key, title, publisher, url, changed_on FROM documents"
                        " WHERE changed_on >= %s ORDER BY changed_on DESC", (since,))
@@ -251,6 +287,8 @@ def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
     def process(url, title, outlet, published, kind, content=None):
         status, kept = "ok", []
         try:
+            if content is None and not public_host(url):
+                raise ValueError("host is not a public address")
             content = content if content is not None else fetch(url)
             text = article_text(content)
         except Exception as e:  # a dead or odd page is recorded, never fatal
@@ -279,13 +317,15 @@ def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
         conn.commit()  # one article at a time: a later failure can't undo earlier work
 
     if sources is not None:
-        changed = rag.ingest_all(conn, sources, raw_dir)
+        rag.ingest_all(conn, sources, raw_dir)
         conn.commit()
-        for key in changed[:MAX_DOC_CHANGES]:
-            src = next(x for x in sources if x["key"] == key)
+        # A queue, not today's change list: changes past the cap or whose extraction failed
+        # are picked up on a later run instead of being lost.
+        for doc in pending_documents(conn, today - timedelta(days=WINDOW_DAYS))[:MAX_DOC_CHANGES]:
+            raw = raw_dir / doc["key"]
             s["official_changed"] += 1
-            process(canonical_url(src["url"]) or src["url"], src["title"], src["publisher"],
-                    today, "official", (raw_dir / key).read_bytes())
+            process(canonical_url(doc["url"]) or doc["url"], doc["title"], doc["publisher"],
+                    today, "official", raw.read_bytes() if raw.exists() else None)
 
     last = last_run(conn)
     since = last - timedelta(days=SLACK_DAYS) if last else today - timedelta(days=WINDOW_DAYS)

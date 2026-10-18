@@ -174,3 +174,30 @@ def test_extract_prompt_keeps_claims_faithful_to_quotes():
     # From the first real run: summaries said "invested" where the quote said "plans to invest".
     assert "only what the quote says" in watch.EXTRACT_SYSTEM
     assert "plans to" in watch.EXTRACT_SYSTEM and "background facts" in watch.EXTRACT_SYSTEM
+
+
+def test_quote_must_match_whole_words():
+    # Review finding: a substring test let "likely" match inside "unlikely".
+    text = ("Officials say the new campus is unlikely to raise residential power bills for Alberta"
+            " families.")
+    assert not watch.quote_in_text("likely to raise residential power bills for Alberta families.",
+                                   text)
+    assert watch.quote_in_text("unlikely to raise residential power bills for Alberta families.",
+                               text)
+    assert not watch.quote_in_text("ials say the new campus is unlikely to raise residential", text)
+
+
+def test_discover_keeps_good_items_when_one_is_bad():
+    body = ('{"articles": [{"url": "https://cbc.ca/a", "title": "T", "outlet": "CBC",'
+            ' "published": "Oct 2026"}, {"url": "https://cbc.ca/b", "title": "T", "outlet": "CBC",'
+            ' "published": "2026-10-17"}, {"url": "https://cbc.ca/c", "title": "T",'
+            ' "outlet": "CBC", "published": null}]}')
+    cands, _ = watch.discover(FakeClient(create=text_response(body)), TODAY, TODAY)
+    assert [c.url for c in cands] == ["https://cbc.ca/b"]
+
+
+def test_public_host_rejects_internal_addresses():
+    assert not watch.public_host("http://169.254.169.254/latest/meta-data")
+    assert not watch.public_host("http://localhost:5432/x")
+    assert not watch.public_host("http://10.0.0.5/a")
+    assert watch.public_host("https://8.8.8.8/")

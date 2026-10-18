@@ -171,3 +171,10 @@ def test_changed_sources_listed():
                 "changed_on": "2026-10-20"}]
     html = claims_page.render(with_watch([], changed), SOURCES)
     assert "changed on 2026-10-20" in html and "Power Bills" in html
+
+
+def test_claim_shows_link_hostname():
+    # Review finding: the outlet name comes from the AI; the hostname shows where the link goes.
+    html = claims_page.render(with_watch([wclaim(1, outlet="CBC", url="https://evil.example/x")]),
+                              SOURCES)
+    assert '<span class="host">evil.example</span>' in html

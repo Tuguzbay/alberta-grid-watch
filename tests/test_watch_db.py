@@ -164,3 +164,49 @@ def test_store_backfills_text_sha_for_unchanged_files(conn, monkeypatch):
     assert conn.execute("SELECT text_sha FROM documents WHERE key = 'b'").fetchone()[0]
     rag.store(conn, src, b"<p>second version</p>")  # so a later real edit is detected
     assert conn.execute("SELECT changed_on FROM documents WHERE key = 'b'").fetchone()[0]
+
+
+def fake_embed(monkeypatch):
+    monkeypatch.setattr(rag, "_model", lambda: Obj(
+        passage_embed=lambda texts: [np.zeros(384) for _ in texts]))
+
+
+def doc_page(word):
+    return (f"<main><p>{WORDS} {word}</p><p>Pembina says the campus could add up to $460 a year"
+            f" to household bills by 2030.</p></main>").encode()
+
+
+def test_run_official_changes_extracted_once(conn, monkeypatch, tmp_path):
+    fake_embed(monkeypatch)
+    srcs = [{"key": f"d{i}", "publisher": "GoA", "title": f"Doc {i}", "published": "",
+             "url": f"https://www.alberta.ca/doc{i}"} for i in range(5)]
+    version = {"v": "one"}
+    monkeypatch.setattr(rag, "fetch", lambda url: doc_page(version["v"]))
+    client, calls = fake_client([], [CLAIM])
+    watch.run(conn, client, NOW, sources=srcs, raw_dir=tmp_path)  # first sight: no changes
+    assert calls == []
+    version["v"] = "two"  # all 5 documents change; only MAX_DOC_CHANGES are extracted now
+    s1 = watch.run(conn, client, NOW, sources=srcs, raw_dir=tmp_path)
+    assert s1["official_changed"] == watch.MAX_DOC_CHANGES and s1["claims_saved"] == 3
+    s2 = watch.run(conn, client, NOW, sources=srcs, raw_dir=tmp_path)  # the rest are not lost
+    assert s2["official_changed"] == 2
+    s3 = watch.run(conn, client, NOW, sources=srcs, raw_dir=tmp_path)  # and nothing repeats
+    assert s3["official_changed"] == 0
+    n = conn.execute("SELECT count(*) FROM claims").fetchone()[0]
+    assert n == 5
+
+
+def test_run_twice_no_duplicates(conn):
+    client, _ = fake_client(["https://cbc.ca/a"], [CLAIM])
+    watch.run(conn, client, NOW, fetch=lambda url: ARTICLE)
+    s = watch.run(conn, client, NOW, fetch=lambda url: ARTICLE)
+    assert s["new_articles"] == 0
+    assert conn.execute("SELECT count(*) FROM claims").fetchone()[0] == 1
+    assert conn.execute("SELECT count(*) FROM articles").fetchone()[0] == 1
+
+
+def test_run_skips_internal_urls(conn):
+    fetched = []
+    client, _ = fake_client(["http://169.254.169.254/latest", "https://cbc.ca/ok"], [CLAIM])
+    s = watch.run(conn, client, NOW, fetch=lambda url: fetched.append(url) or ARTICLE)
+    assert fetched == ["https://cbc.ca/ok"] and s["unreadable"] == 1

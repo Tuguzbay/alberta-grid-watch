@@ -8,6 +8,7 @@ imitating neither: no logos, and the page says it isn't affiliated with Meta.
 import json
 import re
 from html import escape
+from urllib.parse import urlsplit
 
 import pandas as pd
 
@@ -59,6 +60,10 @@ def _claim(c: dict, related: bool = True) -> str:
     url = _safe_url(c["url"])
     source = escape(f"{c['outlet']} · {c['published'] or 'date unknown'}")
     link = f"<a href=\"{escape(url)}\">{source}</a>" if url else source
+    # The outlet name comes from the AI; the hostname shows where the link really goes.
+    host = urlsplit(url).hostname if url else None
+    if host:
+        link += f" <span class=\"host\">{escape(host.removeprefix('www.'))}</span>"
     card = c["topic"] if c["topic"] in CARD_LABEL else None
     rel = (f"<a class=\"rel\" href=\"#{card}\">Related data: see {CARD_LABEL[card]} ↓</a>"
            if related and card else "")
@@ -358,6 +363,8 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
         color:var(--ink-2); border:1px solid var(--rule); border-radius:99px; padding:5px 9px; }}
 .claim .chip {{ font-size:.76rem; padding:4px 10px; }}
 .rel {{ font:600 .82rem/1.2 var(--ui); }}
+.host {{ font:600 .74rem/1 var(--ui); color:var(--ink-2); border:1px solid var(--rule);
+         border-radius:6px; padding:2px 6px; margin-left:4px; white-space:nowrap; }}
 .changed {{ font:400 .92rem/1.6 var(--ui); color:var(--ink-2); padding-left:18px; }}
 .spotted h3, .recent h3 {{ font:700 .74rem/1 var(--ui); letter-spacing:.14em;
   text-transform:uppercase; color:var(--ink-2); margin:22px 0 12px; }}
