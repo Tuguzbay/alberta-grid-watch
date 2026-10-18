@@ -2,6 +2,7 @@
  "as_of_utc": "2026-10-18T16:00:00+00:00",
  "scale": {
   "meta_mw": 970,
+  "meta_full_mw": 1800,
   "edmonton_mw": 1400,
   "requested_mw": 19565,
   "record_mw": 12785.0,
@@ -21,12 +22,12 @@
   },
   {
    "id": "emissions",
-   "headline": "Up to 3.1 Mt CO\u2082 a year if it all ran on gas",
+   "headline": "Phase 1: up to 3.1 Mt CO\u2082 a year if it all ran on gas",
    "verdict": "Significant"
   },
   {
    "id": "water",
-   "headline": "4.2\u20139.6 billion litres a year",
+   "headline": "Phase 1: 4.2\u20139.6 billion litres a year",
    "verdict": "Depends on the plant's cooling"
   }
  ]
