@@ -52,7 +52,7 @@ Runs in `.github/workflows/daily.yml` after `daily.py` and before `build_site.py
 4. **Verify.** `quote_in_text(quote, text)`: normalise both sides (Unicode NFKC, curly → straight quotes, dashes unified, whitespace collapsed, case-sensitive), then substring check. A quote of 8 words or fewer is rejected as too short to be meaningful. Failures are counted and logged, never published.
 5. **Official documents.** `rag_ingest.py` also runs daily (it already skips unchanged files by hash). For up to **3** documents whose hash changed, the new text goes through steps 3–4, with the document as the source, and `documents.changed_on` is recorded.
 6. **Store.** Tables `articles(url PK, title, outlet, published, fetched_at, status, source_kind 'news'|'official')` and `claims(id PK, article_url FK, claim, speaker, quote, topic, numbers jsonb, model, extracted_at)`. The claim `id` is a stable hash of (url, quote), so reruns are idempotent.
-7. **Publish.** `claims.cards()` / `site.build` add `watch: {claims_30d, per_topic, changed_sources, counts}` to `data.json`. IDs listed in `rag/hidden_claims.txt` are excluded.
+7. **Publish.** `site.build` adds (read from the DB; `claims.cards()` stays a pure function of the hourly data) `watch: {claims_30d, per_topic, changed_sources, counts}` to `data.json`. IDs listed in `rag/hidden_claims.txt` are excluded.
 
 **Run summary** (printed to the log): candidates found, new articles, unreadable, claims extracted, claims rejected by the quote check, tokens in/out and estimated cost.
 
