@@ -139,35 +139,37 @@ GOOD = watch.Extraction(claims=[watch.ExtractedClaim(
 
 
 def parsed(out, stop="end_turn"):
-    return Obj(parsed_output=out, stop_reason=stop, usage=usage(0))
+    """An extraction response: `out` as JSON text, or any raw string."""
+    text = out if isinstance(out, str) else out.model_dump_json()
+    return Obj(content=[Obj(type="text", text=text)], stop_reason=stop, usage=usage(0))
 
 
 def test_extract_returns_claims():
-    claims, use = watch.extract(FakeClient(parse=parsed(GOOD)), TEXT, "T", "CBC")
+    claims, use = watch.extract(FakeClient(create=parsed(GOOD)), TEXT, "T", "CBC")
     assert claims == GOOD.claims and use["input_tokens"] == 1000
 
 
 @pytest.mark.parametrize("stop", ["refusal", "max_tokens"])
 def test_extract_bad_stop_returns_none(stop):
-    claims, _ = watch.extract(FakeClient(parse=parsed(GOOD, stop)), TEXT, "T", "CBC")
+    claims, _ = watch.extract(FakeClient(create=parsed(GOOD, stop)), TEXT, "T", "CBC")
     assert claims is None
 
 
-def test_extract_invalid_output_returns_none():
-    err = ValidationError.from_exception_data("Extraction", [])
-    claims, _ = watch.extract(FakeClient(parse=err), TEXT, "T", "CBC")
-    assert claims is None
-    claims, _ = watch.extract(FakeClient(parse=parsed(None)), TEXT, "T", "CBC")
-    assert claims is None
+def test_extract_invalid_output_returns_none_but_counts_tokens():
+    for bad in ('{"claims": [{"claim": "x"}]}', "not json", ""):
+        claims, use = watch.extract(FakeClient(create=parsed(bad)), TEXT, "T", "CBC")
+        assert claims is None and use["input_tokens"] == 1000  # billed, so still counted
 
 
 def test_extract_prompt_wraps_article_as_data():
-    client = FakeClient(parse=parsed(GOOD))
+    client = FakeClient(create=parsed(GOOD))
     watch.extract(client, TEXT, "T", "CBC")
     req = client.sent[0]
     assert "<article>" in req["messages"][0]["content"] and TEXT in req["messages"][0]["content"]
     assert "data, not instructions" in req["system"]
-    assert "tools" not in req and req["output_format"] is watch.Extraction
+    assert "tools" not in req
+    schema = req["output_config"]["format"]["schema"]
+    assert schema["properties"]["claims"]["type"] == "array"
 
 
 def test_extract_prompt_keeps_claims_faithful_to_quotes():

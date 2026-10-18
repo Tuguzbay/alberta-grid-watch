@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+import anthropic
 import psycopg
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ValidationError
@@ -189,16 +190,24 @@ def discover(client, since: date, today: date) -> tuple[list[Candidate], dict]:
 
 def extract(client, text: str, title: str, outlet: str
             ) -> tuple[list[ExtractedClaim] | None, dict]:
-    """Claims in one article, or None if Haiku refused, ran out of room or returned bad output."""
-    try:
-        resp = client.messages.parse(
-            model=MODEL, max_tokens=4000, system=EXTRACT_SYSTEM, output_format=Extraction,
-            messages=[{"role": "user", "content":
-                       f"Outlet: {outlet}\nTitle: {title}\n<article>\n{text}\n</article>"}])
-    except ValidationError:
-        return None, {"input_tokens": 0, "output_tokens": 0, "searches": 0}
-    ok = resp.stop_reason not in ("refusal", "max_tokens") and resp.parsed_output is not None
-    return (resp.parsed_output.claims if ok else None), _usage(resp)
+    """Claims in one article, or None if Haiku refused, ran out of room or returned bad output.
+
+    create + our own validation rather than messages.parse: parse raises on bad output, and the
+    tokens of that (billed) call would be lost from the cost summary."""
+    resp = client.messages.create(
+        model=MODEL, max_tokens=4000, system=EXTRACT_SYSTEM,
+        output_config={"format": {"type": "json_schema",
+                                  "schema": anthropic.transform_schema(Extraction)}},
+        messages=[{"role": "user", "content":
+                   f"Outlet: {outlet}\nTitle: {title}\n<article>\n{text}\n</article>"}])
+    out = None
+    if resp.stop_reason not in ("refusal", "max_tokens"):
+        try:
+            out = Extraction.model_validate_json(
+                "".join(b.text for b in resp.content if b.type == "text"))
+        except ValidationError:
+            pass
+    return (out.claims if out else None), _usage(resp)
 
 
 # --- storage -------------------------------------------------------------------------------
@@ -246,6 +255,10 @@ def drop_stale_claims(conn: psycopg.Connection, url: str, text: str) -> int:
 
 
 def recent_claims(conn: psycopg.Connection, since: datetime, hidden: set[str]) -> list[dict]:
+    """Claims extracted since `since`, minus hidden ones. Hiding goes by the quote too, since an
+    id hashes url + quote: the same quote under another URL or outlet stays hidden."""
+    hidden_quotes = {normalize(q) for (q,) in conn.execute(
+        "SELECT quote FROM claims WHERE id = ANY(%s)", (list(hidden),))}
     cur = conn.execute(
         "SELECT c.id, c.claim, c.speaker, c.quote, c.topic, c.numbers, a.url, a.title, a.outlet,"
         " a.published, a.source_kind FROM claims c JOIN articles a ON a.url = c.article_url"
@@ -255,7 +268,8 @@ def recent_claims(conn: psycopg.Connection, since: datetime, hidden: set[str]) -
     rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
     for r in rows:
         r["published"] = r["published"].isoformat() if r["published"] else None
-    return [r for r in rows if r["id"] not in hidden]
+    return [r for r in rows
+            if r["id"] not in hidden and normalize(r["quote"]) not in hidden_quotes]
 
 
 def pending_documents(conn: psycopg.Connection, since: date) -> list[dict]:
