@@ -10,7 +10,8 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 |---|---|
 | Data pipeline + next-day forecasts (old phases 0–3) | ✅ live, runs daily on GitHub Actions |
 | Claims page: 4 cards, scale strip, verdict rules, light/dark, Newsreader type (PRs #1–#3) | ✅ live |
-| Claim watch: Haiku finds articles and extracts claims with word-for-word verified quotes (PR #4) | ✅ merged 2026-10-18. **Not on the live page yet:** no Daily run since the merge. The next scheduled run (10:05 MT) publishes it. |
+| Claim watch: Haiku finds articles and extracts claims with word-for-word verified quotes (PR #4) | ✅ live since 2026-10-18 (15 claims) |
+| Claim cards: quote-first carousel, links jump to the quote; 970 MW phase 1 vs 1,800 MW full build-out; review fixes; health page restyle (PRs #6–#10) | ✅ live 2026-10-18 |
 | Document search `/api/ask` (old phase 4) | ✅ built, local only (not on the public page) |
 | Bill & scenario simulator (old phase 5) | ❌ dropped, replaced by the claims page |
 
@@ -48,7 +49,7 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
   5. Haiku extracts claims as structured JSON. No tools; the article is treated as data.
   6. **The quote must appear word for word, on whole-word boundaries**, or the claim is dropped.
   7. Results are stored in `articles` / `claims`.
-- Official documents: the 18 in `rag/sources.csv` are re-fetched daily. A change in *visible text* (`documents.text_sha`, not raw HTML: AESO's page has a per-request CSRF token) sets `changed_on`. Changed documents wait in a queue (`pending_documents`) until extracted, at most 3 a day.
+- Official documents: the 19 in `rag/sources.csv` are re-fetched daily. A change in *visible text* (`documents.text_sha`, not raw HTML: AESO's page has a per-request CSRF token) sets `changed_on`. Changed documents wait in a queue (`pending_documents`) until extracted, at most 3 a day.
 - Page: "Spotted this week" is one horizontal, swipeable row of cards. Each source link opens the article scrolled to the quote and highlights it (a `#:~:text=` text fragment, anchored on 3+ word runs without quote marks or brackets; works in Chrome, Edge, Safari and Firefox 131+; older browsers just open the page top). Cards show the AI label, quote, speaker, outlet, link hostname, topic, and "Not checked yet". Also "Recent claims on this topic" inside each card, and "Official sources changed".
 - First real run (2026-10-18): 4 articles (1 blocked with 403), 17 claims, 0 quotes rejected, $0.093. On a manual read, **2 summaries overstated their quote**, so they were hidden and the prompt tightened. The quote check guarantees the quote, not Haiku's one-line summary.
 - Notable claim to follow up: The Energy Mix says the development permit puts the campus at **1.8 GW**. The page uses 970 MW, Meta's approved grid draw.
