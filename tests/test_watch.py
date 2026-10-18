@@ -168,3 +168,9 @@ def test_extract_prompt_wraps_article_as_data():
     assert "<article>" in req["messages"][0]["content"] and TEXT in req["messages"][0]["content"]
     assert "data, not instructions" in req["system"]
     assert "tools" not in req and req["output_format"] is watch.Extraction
+
+
+def test_extract_prompt_keeps_claims_faithful_to_quotes():
+    # From the first real run: summaries said "invested" where the quote said "plans to invest".
+    assert "only what the quote says" in watch.EXTRACT_SYSTEM
+    assert "plans to" in watch.EXTRACT_SYSTEM and "background facts" in watch.EXTRACT_SYSTEM
