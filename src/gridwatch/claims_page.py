@@ -8,7 +8,7 @@ imitating neither: no logos, and the page says it isn't affiliated with Meta.
 import json
 import re
 from html import escape
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import pandas as pd
 
@@ -52,6 +52,28 @@ def _safe_url(url: str) -> str:
     return url if url.lower().startswith(("http://", "https://")) else ""
 
 
+def _at_quote(url: str, text: str) -> str:
+    """Link that scrolls to and highlights the quote (a URL text fragment, `#:~:text=`).
+    Browsers match literally, so anchor on runs of words without quote marks or brackets
+    (pages use curly apostrophes, our text has straight ones and "[pdf]"-style link labels),
+    as start,end words so line breaks or links inside the quote still match."""
+    def enc(words: list[str]) -> str:
+        return quote(" ".join(words), safe="").replace("-", "%2D")  # '-' and ',' are syntax
+    runs: list[list[str]] = [[]]
+    for w in text.split():
+        if re.search(r"['\"‘’“”\[\]]", w):
+            runs.append([])
+        else:
+            runs[-1].append(w)
+    runs = [r for r in runs if len(r) >= 3] or [r for r in runs if r]  # "The" alone is vague
+    base = url.split("#")[0]
+    if not runs:
+        return base
+    if len(runs) == 1 and len(runs[0]) <= 8:
+        return f"{base}#:~:text={enc(runs[0])}"
+    return f"{base}#:~:text={enc(runs[0][:4])},{enc(runs[-1][-4:])}"
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
@@ -59,7 +81,9 @@ def _plural(n: int, word: str) -> str:
 def _claim(c: dict, related: bool = True) -> str:
     url = _safe_url(c["url"])
     source = escape(f"{c['outlet']} · {c['published'] or 'date unknown'}")
-    link = f"<a href=\"{escape(url)}\">{source}</a>" if url else source
+    href = escape(_at_quote(url, c["quote"])) if url else ""
+    link = (f"<a href=\"{href}\" title=\"Opens the article at this quote\">{source}</a>"
+            if url else source)
     # The outlet name comes from the AI; the hostname shows where the link really goes.
     host = urlsplit(url).hostname if url else None
     if host:
@@ -90,7 +114,8 @@ def _spotted(w: dict) -> str:
     return (f"<section id=\"spotted\" class=\"spotted reveal\" aria-labelledby=\"spotted-h\">"
             f"<h2 class=\"kicker\" id=\"spotted-h\">Spotted this week</h2>"
             f"<p class=\"spot-head\">{escape(head)}</p><p class=\"ai\">{AI_LABEL}</p>"
-            + (f"<ol class=\"claims\">{items}</ol>" if items else "")
+            + (f"<ol class=\"claims scroller\" tabindex=\"0\" aria-label=\"Claims spotted this "
+               f"week, scroll sideways\">{items}</ol>" if items else "")
             + (f"<h3>Official sources changed</h3><ul class=\"changed\">{lines}</ul>"
                if lines else "")
             + "</section>")
@@ -348,6 +373,12 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 .ai {{ font:400 .88rem/1.5 var(--ui); color:var(--ink-2); margin:0 0 18px; max-width:720px; }}
 .claims {{ list-style:none; margin:0; padding:0; display:grid; gap:14px;
            grid-template-columns:repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }}
+/* One swipeable row instead of a tall grid: each card a fixed width, snapping into place. */
+.scroller {{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
+             overscroll-behavior-x:contain; padding:4px 2px 14px; scrollbar-width:thin; }}
+.scroller .claim {{ flex:0 0 min(84%, 320px); scroll-snap-align:start; }}
+.scroller:focus-visible {{ outline:2px solid var(--accent); outline-offset:4px;
+                           border-radius:18px; }}
 .claim {{ background:var(--sheet); border:1px solid var(--rule); border-radius:18px;
           padding:16px 18px; display:flex; flex-direction:column; gap:8px;
           transition:transform .3s var(--ease), border-color .3s; }}

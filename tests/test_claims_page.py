@@ -142,7 +142,7 @@ def test_spotted_section_renders_claims():
         "Not reviewed by a person. Quotes are checked word-for-word against the source.")
     assert claims_page.AI_LABEL in html
     assert "<blockquote>quote number 1 with enough words to pass the check</blockquote>" in html
-    assert 'href="https://news.ca/1"' in html and "Not checked yet" in html
+    assert 'href="https://news.ca/1#:~:text=' in html and "Not checked yet" in html
     assert 'href="#bills"' in html and 'href="#spotted"' in html
 
 
@@ -178,3 +178,19 @@ def test_claim_shows_link_hostname():
     html = claims_page.render(with_watch([wclaim(1, outlet="CBC", url="https://evil.example/x")]),
                               SOURCES)
     assert '<span class="host">evil.example</span>' in html
+
+
+def test_claim_link_jumps_to_quote():
+    assert claims_page._at_quote("https://a.ca/x#top", "short - quote, here") == (
+        "https://a.ca/x#:~:text=short%20%2D%20quote%2C%20here")
+    long = "one two three four five six seven eight nine ten"
+    assert claims_page._at_quote("https://a.ca/x", long).endswith(
+        "#:~:text=one%20two%20three%20four,seven%20eight%20nine%20ten")
+    # Quote marks and brackets break literal matching, so anchors skip those words.
+    assert claims_page._at_quote("https://a.ca/x", "The county imposed [pdf] 41 conditions on it") == (
+        "https://a.ca/x#:~:text=The%20county%20imposed,41%20conditions%20on%20it")
+    assert claims_page._at_quote("https://a.ca/x", "The project's main plan here") == (
+        "https://a.ca/x#:~:text=main%20plan%20here")
+    assert claims_page._at_quote("https://a.ca/x", "\"Meta's\"") == "https://a.ca/x"
+    html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
+    assert "#:~:text=" in html and 'class="claims scroller"' in html
