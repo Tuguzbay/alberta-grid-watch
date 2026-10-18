@@ -26,11 +26,11 @@ def test_build_excludes_hidden_claims(conn, tmp_path):
     test_build_writes_all_files(conn, tmp_path)  # fills hourly
     claim = watch.ExtractedClaim(claim="c", speaker="s", quote="q " * 10, topic="bills",
                                  numbers=[])
-    for url in ("https://a.ca/1", "https://a.ca/2"):
+    for i, url in enumerate(("https://a.ca/1", "https://a.ca/2")):
         watch.save_article(conn, url, "T", "CBC", NOW.date(), "ok", "news")
-        watch.save_claims(conn, url, [claim])
+        watch.save_claims(conn, url, [claim.model_copy(update={"quote": f"q{i} " * 10})])
     hidden = tmp_path / "hidden.txt"
-    hidden.write_text(f"# comment\n{watch.claim_id('https://a.ca/1', claim.quote)}\n\n")
+    hidden.write_text(f"# comment\n{watch.claim_id('https://a.ca/1', 'q0 ' * 10)}\n\n")
     data = site.build(conn, tmp_path / "s2", tmp_path / "n2", pd.Timestamp.now(tz="UTC"),
                       hidden_file=hidden)
     urls = [c["url"] for c in data["watch"]["claims"]]

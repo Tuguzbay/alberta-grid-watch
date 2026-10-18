@@ -61,11 +61,11 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 - [ ] **Deferred small fixes from the claim-watch review:**
   - ~~cap the download size~~ done (PR #8)
   - ~~join all text blocks in the discovery answer (citations can split JSON)~~ done (PR #8)
-  - count tokens for failed calls in the cost summary (open: when `messages.parse` rejects the output the SDK raises without the usage, so it'd need a raw-response call)
+  - ~~count tokens for failed calls in the cost summary~~ done (PR #10: extraction uses `messages.create` and validates the JSON itself)
   - ~~merge http/https and `www.` URL duplicates~~ done (PR #8)
   - ~~clamp `since` in the discovery prompt~~ done (PR #8)
   - ~~drop claims whose quote no longer appears after a document changes~~ done (PR #8)
-  - hide by claim, not by (url, quote) (open: ids are a hash of url + quote, so a hidden claim comes back if its URL's canonical form changes)
+  - ~~hide by claim, not by (url, quote)~~ done (PR #10: a hidden id also hides the same quote under any other URL)
 - [ ] **Deferred from the claims-page review:**
   - ~~"a cut of that size is partly true" wording~~ done (PR #8)
   - ~~bills year-on-year comparison with under 2 years of data~~ done (PR #8)

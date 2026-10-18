@@ -74,10 +74,12 @@ def fake_client(urls, claims):
         for u in urls)
     use = Obj(input_tokens=1000, output_tokens=100, server_tool_use=Obj(web_search_requests=1))
     create = Obj(content=[Obj(type="text", text=body)], stop_reason="end_turn", usage=use)
-    parse = Obj(parsed_output=watch.Extraction(claims=claims), stop_reason="end_turn", usage=use)
+    parse = Obj(content=[Obj(type="text", text=watch.Extraction(claims=claims).model_dump_json())],
+                stop_reason="end_turn", usage=use)
     calls = []
-    client = Obj(messages=Obj(create=lambda **kw: create,
-                              parse=lambda **kw: calls.append(kw) or parse))
+    # Discovery is the call with tools; extraction (recorded in `calls`) has none.
+    client = Obj(messages=Obj(create=lambda **kw: create if "tools" in kw
+                              else calls.append(kw) or parse))
     return client, calls
 
 
@@ -230,3 +232,12 @@ def test_run_clamps_since_after_a_long_gap(conn):
     client.messages.create = lambda **kw: sent.append(kw) or create(**kw)
     watch.run(conn, client, NOW, fetch=lambda url: ARTICLE)
     assert str(NOW.date() - timedelta(days=watch.WINDOW_DAYS)) in sent[0]["messages"][0]["content"]
+
+
+def test_hidden_quote_stays_hidden_under_another_url(conn):
+    save(conn)
+    save(conn, url="https://www.ctvnews.ca/same-wire-story")
+    watch.save_claims(conn, URL, [CLAIM])
+    watch.save_claims(conn, "https://www.ctvnews.ca/same-wire-story", [CLAIM])
+    hidden = {watch.claim_id(URL, CLAIM.quote)}
+    assert watch.recent_claims(conn, datetime(2026, 10, 1, tzinfo=UTC), hidden) == []
