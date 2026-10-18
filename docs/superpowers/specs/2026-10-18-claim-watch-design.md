@@ -71,7 +71,7 @@ Runs in `.github/workflows/daily.yml` after `daily.py` and before `build_site.py
 - **DB test** (temp tables): save and reload, a same-day rerun creates no duplicates.
 - **Manual before done:** one real run with the user's key. Every produced claim is read against its article. The run summary numbers (extracted, rejected, cost) go into the PR.
 
-## Open checks (Task 1 of the plan)
-1. Whether `claude-haiku-4-5` accepts the web search tool together with structured output (`output_config.format`) in one request. If not: discovery asks for JSON in the text answer and validates it against the same Pydantic schema.
-2. Current web search pricing per search.
-3. The user creates an Anthropic API key, adds it as the `ANTHROPIC_API_KEY` secret and sets a Console spend limit.
+## Results of the open checks (2026-10-18)
+1. `claude-haiku-4-5` accepts `web_search_20250305` together with `output_config.format` in one request: the spike returned schema-valid JSON with a real Global News URL (1 search, 9,716 input / 127 output tokens). Discovery still parses JSON from the text answer with Pydantic validation (works either way; see ledger ruling).
+2. Web search costs **$10 per 1,000 searches**, and search results count as input tokens (~10K per search). So discovery is about $0.01 per search + ~$0.01 of tokens per search: ≈ $0.06/day at 3 searches. With ≤ 8 articles at ~3–15K tokens each, the worst case is ≈ $0.15/day; typical days are lower. A `pause_turn` stop is treated like any other answer (parsed if possible, else no candidates that day).
+3. The user created the key, added it to GitHub secrets and `.env`, and was asked to set a Console spend limit.
