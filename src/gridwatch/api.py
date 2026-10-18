@@ -13,12 +13,14 @@ def liveness() -> dict:
     return {"status": "ok"}
 
 
-def load_summary() -> dict:
-    with db.connect() as conn:
-        fc = db.forecast_frame(conn)
-        last = conn.execute("SELECT max(ts_utc) FROM hourly WHERE pool_price IS NOT NULL")
-        last_actual = pd.Timestamp(last.fetchone()[0])
-    return health.summary(fc, last_actual, pd.Timestamp.now(tz="UTC"))
+def load_summary(conn=None, now: pd.Timestamp | None = None) -> dict:
+    if conn is None:
+        with db.connect() as conn:
+            return load_summary(conn, now)
+    fc = db.forecast_frame(conn)
+    last = conn.execute("SELECT max(ts_utc) FROM hourly WHERE pool_price IS NOT NULL")
+    last_actual = pd.Timestamp(last.fetchone()[0])
+    return health.summary(fc, last_actual, now or pd.Timestamp.now(tz="UTC"))
 
 
 @app.get("/api/health")
