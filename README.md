@@ -1,6 +1,6 @@
 # Alberta Grid & Data Centre Watch
 
-A public tool that uses real data to answer what large new loads, like proposed AI data centres, could mean for Alberta's grid and power prices.
+**Meta in Alberta: claims vs data.** A public page, rebuilt every day, that checks the worries people raise about Meta's AI data centre in Sturgeon County, and the promises the government makes about it, against Alberta grid data and public documents.
 
 > Scenario outputs are **illustrative**, not predictions, and nothing here attributes a causal price impact to any specific project.
 
@@ -9,16 +9,19 @@ Status and next steps: [PROGRESS.md](PROGRESS.md).
 **Live:** https://tuguzbay.github.io/alberta-grid-watch/ ("Meta in Alberta: claims vs data", rebuilt daily)
 
 ## Parts
-1. **Pool price & demand forecasting**: next-day hourly forecasts compared against simple baselines, with a public model-health page. *(Phases 1–3)*
-2. **Document search**: ask a question and get the best-matching passages from 17 AESO, AUC and Government of Alberta documents, each with its source and page. It's extractive (no generated text) and abstains when nothing matches well enough. *(Phase 4)*
-3. **Bill & scenario simulator**: clearly labelled as hypothetical. *(Phase 5)*
+1. **Claims page** (the live site): four questions (blackouts, power bills, emissions, water), each with a headline number, a rule-based verdict, a chart, "How we know" and its sources, plus a "How big is it?" scale strip. Broadsheet-meets-product-page design, light/dark switch.
+2. **Claim watch**: every day, Claude Haiku finds new articles and changed official documents and extracts the claims they make. A claim is published only if its quote appears word for word in the source. Shown in "Spotted this week" and inside each card.
+3. **Pool price & demand forecasting**: next-day hourly forecasts against simple baselines, with a model-health page (`health.html`).
+4. **Document search**: an extractive `/api/ask` over 18 AESO, AUC and Government of Alberta documents. It runs locally and isn't on the public page.
 
 ## Data sources
 | Source | Use | Terms |
 |---|---|---|
 | [AESO public API](https://developer-apim.aeso.ca/) | pool price, Alberta Internal Load | free key; non-commercial/educational use |
 | [Open-Meteo](https://open-meteo.com/) | hourly weather, Edmonton & Calgary | free, non-commercial, CC BY 4.0, <10k calls/day |
-| AESO / AUC / GoA documents ([rag/sources.csv](rag/sources.csv)) | document search | public documents; quoted with source links |
+| AESO / AUC / GoA documents ([rag/sources.csv](rag/sources.csv)) | document search, claim sources | public documents; quoted with source links |
+| News found by Claude Haiku web search | claim watch | short verbatim quotes with links to the original |
+| [Claude API](https://platform.claude.com/) (`claude-haiku-4-5`) | finding articles, extracting claims | paid, about $1–3/month, capped in code |
 
 ## Dev setup
 ```bash
@@ -40,11 +43,26 @@ python scripts/daily.py         # 10:00 MT daily: ingest + forecast tomorrow (sa
 python scripts/rag_ingest.py    # fetch, chunk, embed rag/sources.csv (--force after chunking changes)
 python scripts/rag_eval.py      # retrieval eval + abstention threshold sweep
 curl -X POST localhost:8000/api/ask -H 'content-type: application/json' -d '{"q":"What is a tethered data centre?"}'
-powershell -File scripts/register_task.ps1   # Windows: run daily.py at 10:00 automatically
+python scripts/watch.py         # claim watch (needs ANTHROPIC_API_KEY; skips cleanly without)
+python scripts/build_site.py    # writes site/ (index.html, health.html, data.json) + snapshot
+DATABASE_URL="$SUPABASE_URL" python scripts/watch.py   # run against production (Supabase)
+powershell -File scripts/register_task.ps1   # old Windows task (superseded by GitHub Actions)
 ```
 
 ## Architecture
-_TODO (Phase 6): diagram._
+```
+GitHub Actions, daily at 10:05 Mountain time (.github/workflows/daily.yml)
+  should_run.py   guard: after 10:00 local and not yet issued today (or a manual run)
+  daily.py        AESO + Open-Meteo -> Supabase `hourly`; next-day forecast -> `forecasts`
+  watch.py        18 official docs re-checked (visible-text fingerprint)
+                  + Haiku web search -> our fetch -> Haiku extraction -> whole-word quote check
+                  -> `articles` / `claims`
+  build_site.py   claims.py (numbers + verdict rules) + claims_page.py -> site/index.html
+                  page.py -> site/health.html; data.json; snapshots/YYYY-MM-DD.json (committed)
+  deploy-pages    site/ -> https://tuguzbay.github.io/alberta-grid-watch/
+Supabase Postgres + pgvector: hourly, forecasts, documents, chunks, articles, claims
+```
+If the data update or claim watch fails, the page still rebuilds from the last good data (with a stale warning after 36 h) and the run fails afterwards, so GitHub emails.
 
 ## Results
 <!-- results:start -->
