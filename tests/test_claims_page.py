@@ -19,7 +19,7 @@ def card(i, **kw):
 
 
 DATA = {
-    "scale": {"meta_mw": 970, "edmonton_mw": 1400, "requested_mw": 19565,
+    "scale": {"meta_mw": 970, "meta_full_mw": 1800, "edmonton_mw": 1400, "requested_mw": 19565,
               "record_mw": 12785.0, "record_ts_local": "2025-12-11 17:00",
               "history_from": 2020},
     "cards": [card(1), card(2, chart=None, sources=["aeso_byog"]), card(3), card(4)],
@@ -201,3 +201,9 @@ def test_claim_card_puts_verified_quote_before_ai_summary():
     html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
     card = html[html.index('<li class="claim">'):]
     assert card.index("<blockquote>") < card.index("AI summary")
+
+
+def test_spotted_is_a_carousel_with_hidden_bar_until_script_runs():
+    html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
+    assert '<div class="car-bar" hidden>' in html
+    assert 'aria-label="Previous claims"' in html and 'aria-label="Next claims"' in html

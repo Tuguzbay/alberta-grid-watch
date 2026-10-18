@@ -101,7 +101,7 @@ def test_charts_stop_at_now():
 
 
 def test_emissions_headline_is_conditional():
-    assert claims.emissions_card()["headline"].startswith("Up to ")
+    assert claims.emissions_card()["headline"].startswith("Phase 1: up to ")
 
 
 def test_scale_reports_history_start():
