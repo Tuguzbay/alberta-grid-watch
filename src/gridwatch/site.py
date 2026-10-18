@@ -49,7 +49,7 @@ def build(conn: psycopg.Connection, out: Path, snapshots: Path, now: pd.Timestam
     snapshots.mkdir(parents=True, exist_ok=True)
     (out / "index.html").write_text(claims_page.render(data, sources()), encoding="utf-8")
     (out / "health.html").write_text(page.render(api.load_summary(conn, now)), encoding="utf-8")
-    (out / "data.json").write_text(json.dumps(data), encoding="utf-8")
+    (out / "data.json").write_text(json.dumps(data, allow_nan=False), encoding="utf-8")
     snap = {"as_of_utc": data["as_of_utc"], "scale": data["scale"],
             "cards": [{k: c[k] for k in ("id", "headline", "verdict")} for c in data["cards"]]}
     day = now.tz_convert(TZ).strftime("%Y-%m-%d")

@@ -59,20 +59,20 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 - [x] **The 1.8 GW vs 970 MW question** (PR #7): the government's "By the numbers" page (`goa_numbers`) says 970 MW is the phase 1 AESO-approved grid allocation and 1,800 MW is the full build-out draw from the grid plus on-site generation over time; Greenlight is 932 MW nameplate. Grid and scale use 970 MW (labelled phase 1); emissions and water show both.
 - [ ] **Remove the Windows task** after a few clean Actions runs.
 - [ ] **Deferred small fixes from the claim-watch review:**
-  - cap the download size
-  - join all text blocks in the discovery answer (citations can split JSON)
-  - count tokens for failed calls in the cost summary
-  - merge http/https and `www.` URL duplicates
-  - clamp `since` in the discovery prompt
-  - drop claims whose quote no longer appears after a document changes
-  - hide by claim, not by (url, quote)
+  - ~~cap the download size~~ done (PR #8)
+  - ~~join all text blocks in the discovery answer (citations can split JSON)~~ done (PR #8)
+  - count tokens for failed calls in the cost summary (open: when `messages.parse` rejects the output the SDK raises without the usage, so it'd need a raw-response call)
+  - ~~merge http/https and `www.` URL duplicates~~ done (PR #8)
+  - ~~clamp `since` in the discovery prompt~~ done (PR #8)
+  - ~~drop claims whose quote no longer appears after a document changes~~ done (PR #8)
+  - hide by claim, not by (url, quote) (open: ids are a hash of url + quote, so a hidden claim comes back if its URL's canonical form changes)
 - [ ] **Deferred from the claims-page review:**
-  - "a cut of that size is partly true" wording
-  - bills year-on-year comparison with under 2 years of data
-  - `allow_nan=False` in `data.json`
-  - cp1251 console crash in `build_site.py` (set `PYTHONIOENCODING=utf-8`)
-  - fresh-DB crash in `cushion.scenario`
-  - staleness keyed on price only
+  - ~~"a cut of that size is partly true" wording~~ done (PR #8)
+  - ~~bills year-on-year comparison with under 2 years of data~~ done (PR #8)
+  - ~~`allow_nan=False` in `data.json`~~ done (PR #8)
+  - ~~cp1251 console crash in `build_site.py` (set `PYTHONIOENCODING=utf-8`)~~ done (PR #8)
+  - ~~fresh-DB crash in `cushion.scenario`~~ done (PR #8)
+  - ~~staleness keyed on price only~~ done (PR #8)
 - [ ] **Model-health page** (`health.html`) still has the old plain look. Restyle it to match. It switches from backtest to live numbers once 14 live days are scored (~2026-10-31).
 
 ## Known caveats (keep saying these)

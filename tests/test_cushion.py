@@ -34,3 +34,9 @@ def test_scenario_raises_price_and_counts_hours_below_zero():
     assert big["expected_spike_hours_new"] > big["expected_spike_hours_base"]
     assert big["hours_headroom_below_zero"] == (h < 1000).sum()
     assert big["beyond_observed"] == (h - 1000 < 0).sum()  # nothing was observed below 0 MW
+
+
+def test_scenario_on_too_little_history_counts_hours_without_prices():
+    h, price = synthetic()
+    sc = cushion.scenario(h[:5], price[:5], 970)
+    assert sc["hours"] == 5 and np.isnan(sc["curve_mean_price_new"])
