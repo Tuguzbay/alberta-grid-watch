@@ -73,7 +73,7 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
   - ~~cp1251 console crash in `build_site.py` (set `PYTHONIOENCODING=utf-8`)~~ done (PR #8)
   - ~~fresh-DB crash in `cushion.scenario`~~ done (PR #8)
   - ~~staleness keyed on price only~~ done (PR #8)
-- [ ] **Model-health page** (`health.html`) still has the old plain look. Restyle it to match. It switches from backtest to live numbers once 14 live days are scored (~2026-10-31).
+- [x] **Model-health page** (`health.html`) restyled to match (PR #9): shared fonts, colour tokens and saved theme; no theme button of its own. It switches from backtest to live numbers once 14 live days are scored (~2026-10-31).
 
 ## Known caveats (keep saying these)
 

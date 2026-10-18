@@ -28,6 +28,12 @@ GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16
 TONE = {"Not so far": "good", "Plausible": "good", "Small": "good",
         "More hours leaning on wind, solar and imports": "warn", "Overstated": "warn",
         "Significant": "warn"}
+# Colour and type tokens, shared with the model-health page.
+LIGHT = """--paper:#f3eee3; --sheet:#fbf8f1; --ink:#161513; --ink-2:#4a463f; --rule:#cfc6b4;
+    --accent:#0a5cff; --accent-soft:#e3ecff; --shadow:#0004;
+    --good:#0f6b3a; --good-bg:#dff2e5; --warn:#8a4b00; --warn-bg:#fdebd0;
+    --neutral:#3d4450; --neutral-bg:#e6e8ec; color-scheme:light;
+    --serif:"Newsreader", Georgia, serif; --ui:"Figtree", "Segoe UI", system-ui, sans-serif;"""
 DARK = """--paper:#121110; --sheet:#1b1a18; --ink:#efe9dc; --ink-2:#bbb4a5; --rule:#3a3631;
     --accent:#7aa3ff; --accent-soft:#1d2a46; --shadow:#0009;
     --good:#86dba6; --good-bg:#16352a; --warn:#ffc47e; --warn-bg:#3d2a12;
@@ -245,12 +251,7 @@ try {{
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
 <style>
-:root {{
-  --paper:#f3eee3; --sheet:#fbf8f1; --ink:#161513; --ink-2:#4a463f; --rule:#cfc6b4;
-  --accent:#0a5cff; --accent-soft:#e3ecff; --shadow:#0004;
-  --good:#0f6b3a; --good-bg:#dff2e5; --warn:#8a4b00; --warn-bg:#fdebd0;
-  --neutral:#3d4450; --neutral-bg:#e6e8ec; color-scheme:light;
-  --serif:"Newsreader", Georgia, serif; --ui:"Figtree", "Segoe UI", system-ui, sans-serif;
+:root {{ {LIGHT}
   --ease:cubic-bezier(.2,.8,.2,1);
   --grain:url("{GRAIN}");
 }}
