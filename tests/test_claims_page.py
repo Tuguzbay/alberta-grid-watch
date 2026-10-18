@@ -68,3 +68,27 @@ def test_page_checks_staleness_in_browser():
 
 def test_record_tile_says_since_when():
     assert "Highest hour since 2020" in claims_page.render(DATA, SOURCES)
+
+
+def test_at_a_glance_links_every_section():
+    html = claims_page.render(DATA, SOURCES)
+    for c in DATA["cards"]:
+        assert f'href="#{c["id"]}"' in html and f'id="{c["id"]}"' in html
+
+
+def test_scale_bars_are_drawn_to_scale():
+    html = claims_page.render(DATA, SOURCES)
+    assert "--w:100.0%" in html  # the largest value fills the bar
+    assert f"--w:{970 / 19565:.1%}" in html
+
+
+def test_page_says_it_is_independent():
+    assert "not affiliated with Meta" in claims_page.render(DATA, SOURCES)
+
+
+def test_short_answer_is_the_first_sentence():
+    data = copy.deepcopy(DATA)
+    data["cards"][0]["explain"] = "First point. Second point here."
+    html = claims_page.render(data, SOURCES)
+    assert '<p class="lead">First point.</p>' in html
+    assert "Second point here." in html
