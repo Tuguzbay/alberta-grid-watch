@@ -55,7 +55,7 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 
 ## Next steps (pick one tomorrow)
 
-- [ ] **Quote-first claim cards** (reviewer suggestion): make the verified quote the card's main text and Haiku's summary the smaller line, since the quote is the only checked part.
+- [x] **Quote-first claim cards** (done in PR #6): make the verified quote the card's main text and Haiku's summary the smaller line, since the quote is the only checked part.
 - [ ] **The 1.8 GW vs 970 MW question:** decide how the scale strip and cards should present it (970 MW grid draw vs 1.8 GW total campus need; the 932 MW private plant covers the gap?). Needs sources checked first.
 - [ ] **Remove the Windows task** after a few clean Actions runs.
 - [ ] **Deferred small fixes from the claim-watch review:**

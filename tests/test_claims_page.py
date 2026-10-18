@@ -187,10 +187,17 @@ def test_claim_link_jumps_to_quote():
     assert claims_page._at_quote("https://a.ca/x", long).endswith(
         "#:~:text=one%20two%20three%20four,seven%20eight%20nine%20ten")
     # Quote marks and brackets break literal matching, so anchors skip those words.
-    assert claims_page._at_quote("https://a.ca/x", "The county imposed [pdf] 41 conditions on it") == (
+    q = "The county imposed [pdf] 41 conditions on it"
+    assert claims_page._at_quote("https://a.ca/x", q) == (
         "https://a.ca/x#:~:text=The%20county%20imposed,41%20conditions%20on%20it")
     assert claims_page._at_quote("https://a.ca/x", "The project's main plan here") == (
         "https://a.ca/x#:~:text=main%20plan%20here")
     assert claims_page._at_quote("https://a.ca/x", "\"Meta's\"") == "https://a.ca/x"
     html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
     assert "#:~:text=" in html and 'class="claims scroller"' in html
+
+
+def test_claim_card_puts_verified_quote_before_ai_summary():
+    html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
+    card = html[html.index('<li class="claim">'):]
+    assert card.index("<blockquote>") < card.index("AI summary")

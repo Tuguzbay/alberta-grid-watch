@@ -92,8 +92,9 @@ def _claim(c: dict, related: bool = True) -> str:
     rel = (f"<a class=\"rel\" href=\"#{card}\">Related data: see {CARD_LABEL[card]} ↓</a>"
            if related and card else "")
     topic = escape(TOPIC_LABEL.get(c["topic"], "Other"))
-    return (f"<li class=\"claim\"><p class=\"what\">{escape(c['claim'])}</p>"
-            f"<blockquote>{escape(c['quote'])}</blockquote>"
+    # Quote first: it's the only part checked word for word; the summary is the AI's reading.
+    return (f"<li class=\"claim\"><blockquote>{escape(c['quote'])}</blockquote>"
+            f"<p class=\"what\"><span>AI summary</span> {escape(c['claim'])}</p>"
             f"<p class=\"who\">{escape(c['speaker'])} · {link}</p>"
             f"<p class=\"tags\"><span class=\"tag\">{topic}</span>"
             f"<span class=\"chip neutral\">Not checked yet</span>{rel}</p></li>")
@@ -383,9 +384,11 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
           padding:16px 18px; display:flex; flex-direction:column; gap:8px;
           transition:transform .3s var(--ease), border-color .3s; }}
 .claim:hover {{ transform:translateY(-2px); border-color:var(--accent); }}
-.claim .what {{ font:700 1.02rem/1.35 var(--ui); margin:0; }}
 .claim blockquote {{ margin:0; padding-left:12px; border-left:3px solid var(--accent);
-                     font:italic 400 1rem/1.5 var(--serif); color:var(--ink-2); }}
+                     font:italic 400 1.08rem/1.5 var(--serif); color:var(--ink); }}
+.claim .what {{ font:400 .88rem/1.4 var(--ui); color:var(--ink-2); margin:0; }}
+.claim .what span {{ font:700 .68rem/1 var(--ui); letter-spacing:.12em; text-transform:uppercase;
+                     margin-right:4px; }}
 .claim blockquote::before {{ content:"“"; }}
 .claim blockquote::after {{ content:"”"; }}
 .claim .who {{ font:400 .85rem/1.4 var(--ui); color:var(--ink-2); margin:0; }}
