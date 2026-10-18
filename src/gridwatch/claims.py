@@ -12,10 +12,14 @@ import pandas as pd
 from gridwatch import cushion, health, impacts
 from gridwatch.features import TZ
 
-META_MW = 970
+META_MW = 970  # phase 1, AESO-approved grid allocation
+META_FULL_MW = 1800  # full build-out, grid plus on-site generation over time
 
 FACTS = {
-    "meta_mw": {"value": META_MW, "label": "Meta campus grid draw (MW)", "source": "goa_bills"},
+    "meta_mw": {"value": META_MW, "label": "Meta phase 1 grid draw (MW)", "source": "goa_numbers"},
+    "meta_full_mw": {"value": META_FULL_MW,
+                     "label": "Meta campus draw at full build-out, grid plus on-site (MW)",
+                     "source": "goa_numbers"},
     "edmonton_mw": {"value": 1400, "label": "City of Edmonton load (MW)",
                     "source": "aeso_factsheet"},
     "requested_mw": {"value": 19565, "label": "Data-centre load requested (MW, as of 2026-07-30)",
@@ -46,7 +50,8 @@ def _first_full_day(index: pd.DatetimeIndex) -> pd.Timestamp:
 
 def scale(df: pd.DataFrame) -> dict:
     load = df["load_mw"].dropna()
-    return {"meta_mw": META_MW, "edmonton_mw": FACTS["edmonton_mw"]["value"],
+    return {"meta_mw": META_MW, "meta_full_mw": META_FULL_MW,
+            "edmonton_mw": FACTS["edmonton_mw"]["value"],
             "requested_mw": FACTS["requested_mw"]["value"], "record_mw": float(load.max()),
             "record_ts_local": _local(load.idxmax()).strftime("%Y-%m-%d %H:%M"),
             "history_from": _first_full_day(load.index).year}
@@ -93,7 +98,7 @@ def reliability_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
             "They're a warning sign, not blackouts: AESO has emergency steps first, and "
             "the government says large loads are cut before homes.",
         ],
-        "sources": ["goa_grid", "goa_bills"],
+        "sources": ["goa_grid", "goa_numbers"],
     }
 
 
@@ -141,41 +146,49 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
 
 
 def emissions_card() -> dict:
-    f = impacts.footprint(META_MW)
+    f, full = impacts.footprint(META_MW), impacts.footprint(META_FULL_MW)
     share = f["share_of_ab_electricity_co2"]
     return {
         "id": "emissions",
         "question": "Is it bad for emissions?",
-        "headline": f"Up to {f['co2_mt']:.1f} Mt CO₂ a year if it all ran on gas",
+        "headline": f"Phase 1: up to {f['co2_mt']:.1f} Mt CO₂ a year if it all ran on gas",
         "verdict": "Significant" if share >= 0.10 else "Noticeable" if share >= 0.03 else "Small",
         "explain": (f"If all {META_MW} MW ran around the clock on new gas, it would emit about "
                     f"{f['co2_mt']:.1f} million tonnes of CO₂ a year, {share:.0%} of what "
-                    f"Alberta's power sector emitted in 2023. This verdict would change if the "
+                    f"Alberta's power sector emitted in 2023. That's phase 1; at full build-out "
+                    f"({META_FULL_MW:,} MW) it would be about {full['co2_mt']:.1f} million tonnes, "
+                    f"{full['share_of_ab_electricity_co2']:.0%}. This verdict would change if the "
                     f"campus runs below full power or buys wind and solar."),
         "chart": None,
         "how": [
             "Assumes the load runs flat all year: an upper bound on energy.",
             "Assumes Alberta's best gas plants (0.37 t/MWh): a lower bound on emissions.",
+            f"Phase 1 is Meta's {META_MW} MW AESO-approved grid allocation. Full build-out is "
+            f"{META_FULL_MW:,} MW from the grid plus on-site generation, per the government; it "
+            f"hasn't said when.",
             *(f"{k}: {v}" for k, v in impacts.SOURCES.items()),
         ],
-        "sources": ["goa_bills"],
+        "sources": ["goa_numbers"],
     }
 
 
 def water_card() -> dict:
-    f = impacts.footprint(META_MW)
+    f, full = impacts.footprint(META_MW), impacts.footprint(META_FULL_MW)
     lo, hi = f["water_bl_cooling tower"]
+    flo, fhi = full["water_bl_cooling tower"]
     dlo, dhi = f["water_bl_dry cooling"]
     plo, phi = f["people_equiv_cooling tower"]
     return {
         "id": "water",
         "question": "Will it drain our water?",
-        "headline": f"{lo:.1f}–{hi:.1f} billion litres a year",
+        "headline": f"Phase 1: {lo:.1f}–{hi:.1f} billion litres a year",
         "verdict": "Depends on the plant's cooling",
         "explain": (f"A gas plant powering {META_MW} MW with cooling towers would use "
                     f"{lo:.1f}–{hi:.1f} billion litres a year, about what {round(plo, -3):,.0f}–"
                     f"{round(phi, -3):,.0f} "
-                    f"Albertans use. With dry cooling it's {dlo:.2f}–{dhi:.2f} billion. The "
+                    f"Albertans use. With dry cooling it's {dlo:.2f}–{dhi:.2f} billion. At full "
+                    f"build-out ({META_FULL_MW:,} MW) cooling towers would use {flo:.1f}–{fhi:.1f} "
+                    f"billion. The "
                     f"government's 'less than a golf course' claim is about the data centre "
                     f"itself, not its power plant. This verdict would change once the plant's "
                     f"cooling design and water licence are public."),
@@ -183,10 +196,11 @@ def water_card() -> dict:
         "how": [
             "Water here is the gas plant's cooling use only. The data centre's own cooling is "
             "separate and the government says it is closed-loop.",
-            "Uses NREL's range for combined-cycle gas plants, scaled to a flat 970 MW load.",
+            f"Uses NREL's range for combined-cycle gas plants, scaled to a flat {META_MW} MW load "
+            f"(phase 1) and {META_FULL_MW:,} MW (full build-out).",
             *(f"{k}: {v}" for k, v in impacts.SOURCES.items() if "Water" in k or "L/" in k),
         ],
-        "sources": ["goa_water", "goa_bills"],
+        "sources": ["goa_water", "goa_numbers"],
     }
 
 

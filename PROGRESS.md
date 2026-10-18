@@ -56,7 +56,7 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 ## Next steps (pick one tomorrow)
 
 - [x] **Quote-first claim cards** (done in PR #6): make the verified quote the card's main text and Haiku's summary the smaller line, since the quote is the only checked part.
-- [ ] **The 1.8 GW vs 970 MW question:** decide how the scale strip and cards should present it (970 MW grid draw vs 1.8 GW total campus need; the 932 MW private plant covers the gap?). Needs sources checked first.
+- [x] **The 1.8 GW vs 970 MW question** (PR #7): the government's "By the numbers" page (`goa_numbers`) says 970 MW is the phase 1 AESO-approved grid allocation and 1,800 MW is the full build-out draw from the grid plus on-site generation over time; Greenlight is 932 MW nameplate. Grid and scale use 970 MW (labelled phase 1); emissions and water show both.
 - [ ] **Remove the Windows task** after a few clean Actions runs.
 - [ ] **Deferred small fixes from the claim-watch review:**
   - cap the download size
@@ -80,7 +80,7 @@ _Last updated: 2026-10-18 (end of day)._ This is the hand-off file: read it firs
 - **Price model:** about 11% better than a 30-day same-hour average, but it misses spikes (>$200/MWh) by ~$440. Spikes are ~2.5% of hours and ~36% of price.
 - **AESO's stored load forecast:** it's revised near real time (~0.3% error), so it isn't a day-ahead baseline.
 - **"Spare capacity" / tight hours:** dispatchable capability minus load. Wind, solar and imports aren't counted, so it's a thinner-cushion signal, not blackout risk, and not evidence about Meta.
-- **Impacts:** an upper bound on energy (flat load) and a lower bound on emissions (best-gas factor).
+- **Impacts:** an upper bound on energy (flat load) and a lower bound on emissions (best-gas factor). Headlines are phase 1 (970 MW); full build-out (1,800 MW) is shown alongside, with no public date.
 - **Bills card:** the $200M in transmission fees is the government's figure, not verified. The 7.6% share uses AESO's 2026 revenue requirement ($2,636.9M) and is an upper bound.
 - **Claim watch:** AI-extracted, not reviewed by a person. The quote is verified; the summary, speaker and outlet name come from Haiku. The link hostname is shown so a wrong outlet is visible.
 - **Document search:** extractive, with the threshold tuned in-sample. A high score means the topic matches, not that the answer is there.

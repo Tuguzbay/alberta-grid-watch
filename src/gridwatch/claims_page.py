@@ -171,7 +171,7 @@ def _glance(cards: list[dict], w: dict) -> str:
 
 
 def _scale(s: dict) -> str:
-    items = [(s["meta_mw"], "Meta campus", "grid draw"),
+    items = [(s["meta_mw"], "Meta campus", "phase 1 grid draw"),
              (s["edmonton_mw"], "City of Edmonton", "typical load"),
              (s["record_mw"], f"Highest hour since {s['history_from']}",
               f"all of Alberta, {s['record_ts_local']}"),
@@ -183,8 +183,10 @@ def _scale(s: dict) -> str:
         f"<b>{v:,.0f}<small> MW</small></b></li>" for v, name, note in items)
     return (f"<section class=\"scale\" aria-labelledby=\"scale-h\"><h2 class=\"kicker\" "
             f"id=\"scale-h\">How big is it?</h2><ul>{bars}</ul><p class=\"note\">Bars drawn to "
-            f"scale. Meta alone would draw about two-thirds of what Edmonton uses; the "
-            f"requests add up to more than Alberta has ever used at once.</p></section>")
+            f"scale. Meta's first phase alone would draw about two-thirds of what Edmonton "
+            f"uses. At full build-out the campus needs {s['meta_full_mw']:,} MW, from the grid "
+            f"plus its own generation. The requests add up to more than Alberta has ever used "
+            f"at once.</p></section>")
 
 
 def _card(i: int, c: dict, sources: dict[str, dict], recent: list[dict] = ()) -> str:
