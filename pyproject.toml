@@ -13,7 +13,8 @@ dependencies = [
     "holidays>=0.60",
     "fastembed>=0.5",
     "pypdf>=5",
-    "tzdata>=2026.5",  # 2026e: Alberta on UTC-6 all year; workflows set PYTHONTZPATH="" to use it
+    "tzdata>=2026.5",
+    "anthropic>=1.15",  # 2026e: Alberta on UTC-6 all year; workflows set PYTHONTZPATH="" to use it
 ]
 
 [project.optional-dependencies]
