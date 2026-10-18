@@ -35,6 +35,7 @@ DARK = """--paper:#121110; --sheet:#1b1a18; --ink:#efe9dc; --ink-2:#bbb4a5; --ru
 SUN = ("<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='4.5'/><path d='M12 "
        "1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3"
        " 6.7l2.1-2.1'/></svg>")
+CHEVRON = "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M9 5l7 7-7 7'/></svg>"
 MOON = "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z'/></svg>"  # noqa: E501
 
 
@@ -106,6 +107,18 @@ def _changed(s: dict) -> str:
     return f"<li>{escape(s['publisher'])}, {title}, changed on {escape(s['changed_on'])}</li>"
 
 
+def _carousel(items: str, label: str) -> str:
+    """A swipeable row. The bar (count, progress, arrows) is shown by the page script."""
+    arrows = "".join(f"<button class=\"car-btn{' prev' if d < 0 else ''}\" type=\"button\" "
+                     f"data-dir=\"{d}\" aria-label=\"{'Previous' if d < 0 else 'Next'} claims\">"
+                     f"{CHEVRON}</button>" for d in (-1, 1))
+    return (f"<div class=\"carousel\"><div class=\"car-bar\" hidden>"
+            f"<span class=\"car-count\" aria-live=\"polite\"></span>"
+            f"<span class=\"car-track\"><span class=\"car-fill\"></span></span>{arrows}</div>"
+            f"<ol class=\"claims scroller\" tabindex=\"0\" aria-label=\"{label}, scroll "
+            f"sideways\">{items}</ol></div>")
+
+
 def _spotted(w: dict) -> str:
     n, m = w.get("week_count", 0), w.get("week_sources", 0)
     head = (f"{_plural(n, 'new claim')} from {_plural(m, 'source')} this week" if n
@@ -115,8 +128,7 @@ def _spotted(w: dict) -> str:
     return (f"<section id=\"spotted\" class=\"spotted reveal\" aria-labelledby=\"spotted-h\">"
             f"<h2 class=\"kicker\" id=\"spotted-h\">Spotted this week</h2>"
             f"<p class=\"spot-head\">{escape(head)}</p><p class=\"ai\">{AI_LABEL}</p>"
-            + (f"<ol class=\"claims scroller\" tabindex=\"0\" aria-label=\"Claims spotted this "
-               f"week, scroll sideways\">{items}</ol>" if items else "")
+            + (_carousel(items, "Claims spotted this week") if items else "")
             + (f"<h3>Official sources changed</h3><ul class=\"changed\">{lines}</ul>"
                if lines else "")
             + "</section>")
@@ -378,6 +390,33 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 .scroller {{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
              overscroll-behavior-x:contain; padding:4px 2px 14px; scrollbar-width:thin; }}
 .scroller .claim {{ flex:0 0 min(84%, 320px); scroll-snap-align:start; }}
+/* Carousel: the page script adds .js, which swaps the scrollbar for count + progress + arrows
+   and fades whichever edge still has cards behind it. */
+.carousel.js .scroller {{ scrollbar-width:none; --fl:0px; --fr:56px; padding-bottom:6px;
+  -webkit-mask-image:linear-gradient(90deg, transparent, #000 var(--fl),
+                                     #000 calc(100% - var(--fr)), transparent);
+  mask-image:linear-gradient(90deg, transparent, #000 var(--fl),
+                             #000 calc(100% - var(--fr)), transparent); }}
+.carousel.js .scroller::-webkit-scrollbar {{ display:none; }}
+.carousel.js .scroller.mid, .carousel.js .scroller.end {{ --fl:40px; }}
+.carousel.js .scroller.end {{ --fr:0px; }}
+.car-bar {{ display:flex; align-items:center; gap:12px; margin:0 0 14px; }}
+.car-bar[hidden] {{ display:none; }}
+.car-count {{ font:700 .78rem/1 var(--ui); letter-spacing:.08em; color:var(--ink-2);
+              font-variant-numeric:tabular-nums; white-space:nowrap; }}
+.car-track {{ flex:1; height:3px; border-radius:99px; background:var(--rule); overflow:hidden; }}
+.car-fill {{ display:block; height:100%; width:0; border-radius:inherit; background:var(--accent);
+             transition:width .35s var(--ease); }}
+.car-btn {{ inline-size:40px; block-size:40px; display:grid; place-items:center; flex:none;
+            border-radius:50%; border:1px solid var(--rule); background:var(--sheet);
+            color:var(--ink); cursor:pointer; box-shadow:0 2px 10px -4px var(--shadow);
+            transition:transform .25s var(--ease), background .25s, opacity .25s; }}
+.car-btn:hover:not(:disabled) {{ transform:translateY(-1px); background:var(--accent-soft); }}
+.car-btn:focus-visible {{ outline:2px solid var(--accent); outline-offset:2px; }}
+.car-btn:disabled {{ opacity:.35; cursor:default; box-shadow:none; }}
+.car-btn svg {{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2;
+                stroke-linecap:round; stroke-linejoin:round; }}
+.car-btn.prev svg {{ transform:scaleX(-1); }}
 .scroller:focus-visible {{ outline:2px solid var(--accent); outline-offset:4px;
                            border-radius:18px; }}
 .claim {{ background:var(--sheet); border:1px solid var(--rule); border-radius:18px;
@@ -464,6 +503,30 @@ if ("IntersectionObserver" in window) {{
   }}), {{rootMargin: "0px 0px -8% 0px"}});
   items.forEach(el => io.observe(el));
 }} else items.forEach(el => el.classList.add("in"));
+
+// Carousels: count, progress and arrows; edge fades only where cards are hidden.
+document.querySelectorAll(".carousel").forEach(car => {{
+  const row = car.querySelector(".scroller"), cards = row.children, n = cards.length;
+  const bar = car.querySelector(".car-bar"), count = car.querySelector(".car-count");
+  const fill = car.querySelector(".car-fill"), [prev, next] = car.querySelectorAll(".car-btn");
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  car.classList.add("js"); bar.hidden = false;
+  function update() {{
+    const step = n > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : row.clientWidth;
+    const max = row.scrollWidth - row.clientWidth, x = row.scrollLeft;
+    const first = Math.round(x / step);
+    const shown = Math.max(1, Math.floor((row.clientWidth + 8) / step));
+    const last = x >= max - 2 ? n : Math.min(n, first + shown);
+    count.textContent = n <= shown ? `${{n}} of ${{n}}` : `${{first + 1}}–${{last}} of ${{n}}`;
+    fill.style.width = `${{100 * (x + row.clientWidth) / row.scrollWidth}}%`;
+    prev.disabled = x <= 2; next.disabled = x >= max - 2;
+    row.classList.toggle("mid", x > 2 && x < max - 2); row.classList.toggle("end", x >= max - 2);
+  }}
+  [prev, next].forEach(b => b.addEventListener("click", () => row.scrollBy({{
+    left: b.dataset.dir * row.clientWidth * .9, behavior: calm.matches ? "auto" : "smooth"}})));
+  row.addEventListener("scroll", update, {{passive: true}});
+  addEventListener("resize", update); update();
+}});
 
 // Theme switch: follows the system until the visitor picks, then remembers the pick.
 const root = document.documentElement, btn = document.getElementById("theme-toggle");
