@@ -202,6 +202,6 @@
   - Add `watch: ${{ steps.watch.outcome }}` to the job outputs.
   - Extend the deploy job's final check to fail if `needs.build.outputs.watch == 'failure'`, with its own message.
   - Validate with `yaml.safe_load`.
-- [ ] **Step 2:** Run it for real, locally against Supabase, with the user's key: `DATABASE_URL=$SUPABASE_URL python scripts/watch.py`. Expected: a summary line with `est_cost_usd` < 0.15. Then read **every** saved claim against its article and record in the PR: claims saved, quotes rejected, the cost, and any claim judged wrong (hide it via `rag/hidden_claims.txt`).
+- [ ] **Step 2:** Run it for real, locally against Supabase, with the user's key: `DATABASE_URL=$SUPABASE_URL python scripts/watch.py`. Expected: a summary line with `est_cost_usd` < 0.20. Then read **every** saved claim against its article and record in the PR: claims saved, quotes rejected, the cost, and any claim judged wrong (hide it via `rag/hidden_claims.txt`).
 - [ ] **Step 3:** Update PROGRESS.md (phase status, caps, how to hide a claim) and README.md (one paragraph on Claim watch, the AI label, the cost). Commit: `git commit -m "Claim watch: daily workflow step, docs"`.
 - [ ] **Step 4:** Push the branch and open a PR, as with PRs #1–#3. The user merges it and runs the Daily workflow. Check that the live page shows "Spotted this week".
