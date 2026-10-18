@@ -114,3 +114,60 @@ def test_scroll_reveal_never_hides_content_without_js():
 
 def test_uses_newsreader():
     assert "family=Newsreader" in claims_page.render(DATA, SOURCES)
+
+
+def wclaim(i, topic="bills", **kw):
+    c = {"id": f"id{i}", "claim": f"Claim {i}", "speaker": "Pembina Institute",
+         "quote": f"quote number {i} with enough words to pass the check", "topic": topic,
+         "numbers": [], "url": f"https://news.ca/{i}", "title": f"Story {i}", "outlet": "CBC",
+         "published": "2026-10-17", "source_kind": "news"}
+    return c | kw
+
+
+def with_watch(claims, changed=()):
+    per = {}
+    for c in claims:
+        per.setdefault(c["topic"], []).append(c)
+    return {**DATA, "cards": [card(1, id="bills"), card(2), card(3), card(4)],
+            "watch": {"claims": claims, "week_count": len(claims), "week_sources": 1,
+                      "per_card": {k: v[:3] for k, v in per.items() if k == "bills"},
+                      "changed_sources": list(changed)}}
+
+
+def test_spotted_section_renders_claims():
+    html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
+    assert 'id="spotted"' in html
+    assert claims_page.AI_LABEL == (
+        "Found and summarised automatically by AI (Claude Haiku) from public articles. "
+        "Not reviewed by a person. Quotes are checked word-for-word against the source.")
+    assert claims_page.AI_LABEL in html
+    assert "<blockquote>quote number 1 with enough words to pass the check</blockquote>" in html
+    assert 'href="https://news.ca/1"' in html and "Not checked yet" in html
+    assert 'href="#bills"' in html and 'href="#spotted"' in html
+
+
+def test_spotted_empty_state():
+    assert "No new claims this week." in claims_page.render(DATA, SOURCES)
+
+
+def test_watch_cards_escape_article_text():
+    bad = wclaim(1, speaker="<script>x</script>", quote='"><img src=x onerror=alert(1)>',
+                 url="javascript:alert(1)")
+    html = claims_page.render(with_watch([bad]), SOURCES)
+    assert "<script>x" not in html and "&lt;script&gt;x" in html
+    assert "<img src=x" not in html and 'href="javascript:' not in html
+
+
+def test_recent_claims_inside_story():
+    html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
+    story = html[html.index('<article id="bills"'):]
+    story = story[:story.index("</article>")]
+    assert "Recent claims on this topic (1)" in story and "quote number 1" in story
+
+
+def test_changed_sources_listed():
+    changed = [{"key": "goa_bills", "title": "Power Bills", "publisher": "Government of Alberta",
+                "url": "https://www.alberta.ca/datacentres/power-bills",
+                "changed_on": "2026-10-20"}]
+    html = claims_page.render(with_watch([], changed), SOURCES)
+    assert "changed on 2026-10-20" in html and "Power Bills" in html

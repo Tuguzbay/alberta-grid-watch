@@ -18,3 +18,20 @@ def test_build_writes_all_files(conn, tmp_path):
     snap = json.loads((snaps / "2026-10-16.json").read_text(encoding="utf-8"))
     assert [c["id"] for c in snap["cards"]] == [c["id"] for c in data["cards"]]
     assert "chart" not in json.dumps(snap)
+
+
+def test_build_excludes_hidden_claims(conn, tmp_path):
+    from gridwatch import watch
+
+    test_build_writes_all_files(conn, tmp_path)  # fills hourly
+    claim = watch.ExtractedClaim(claim="c", speaker="s", quote="q " * 10, topic="bills",
+                                 numbers=[])
+    for url in ("https://a.ca/1", "https://a.ca/2"):
+        watch.save_article(conn, url, "T", "CBC", NOW.date(), "ok", "news")
+        watch.save_claims(conn, url, [claim])
+    hidden = tmp_path / "hidden.txt"
+    hidden.write_text(f"# comment\n{watch.claim_id('https://a.ca/1', claim.quote)}\n\n")
+    data = site.build(conn, tmp_path / "s2", tmp_path / "n2", pd.Timestamp.now(tz="UTC"),
+                      hidden_file=hidden)
+    urls = [c["url"] for c in data["watch"]["claims"]]
+    assert urls == ["https://a.ca/2"] and data["watch"]["per_card"]["bills"][0]["url"] == urls[0]
