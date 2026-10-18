@@ -77,3 +77,94 @@ def test_extraction_schema_rejects_unknown_topic():
     with pytest.raises(ValidationError):
         watch.Extraction.model_validate({"claims": [
             {"claim": "c", "speaker": "s", "quote": "q", "topic": "crypto", "numbers": []}]})
+
+
+class Obj:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def usage(searches=2):
+    return Obj(input_tokens=1000, output_tokens=200,
+               server_tool_use=Obj(web_search_requests=searches))
+
+
+class FakeClient:
+    """Stands in for anthropic.Anthropic: records requests, returns canned responses."""
+
+    def __init__(self, create=None, parse=None):
+        self.sent = []
+        self.messages = Obj(create=self._create, parse=self._parse)
+        self._c, self._p = create, parse
+
+    def _create(self, **kw):
+        self.sent.append(kw)
+        return self._c(kw) if callable(self._c) else self._c
+
+    def _parse(self, **kw):
+        self.sent.append(kw)
+        if isinstance(self._p, Exception):
+            raise self._p
+        return self._p(kw) if callable(self._p) else self._p
+
+
+def text_response(text, stop="end_turn"):
+    return Obj(content=[Obj(type="server_tool_use"), Obj(type="text", text=text)],
+               stop_reason=stop, usage=usage())
+
+
+def test_discover_parses_candidates():
+    body = ('Here you go:\n```json\n{"articles": [{"url": "https://cbc.ca/a", "title": "T", '
+            '"outlet": "CBC", "published": "2026-10-17"}]}\n```')
+    client = FakeClient(create=text_response(body))
+    cands, use = watch.discover(client, TODAY - timedelta(days=3), TODAY)
+    assert [c.url for c in cands] == ["https://cbc.ca/a"]
+    assert use == {"input_tokens": 1000, "output_tokens": 200, "searches": 2}
+    req = client.sent[0]
+    assert req["model"] == "claude-haiku-4-5"
+    assert req["tools"][0]["type"] == "web_search_20250305"
+    assert req["tools"][0]["max_uses"] == watch.MAX_SEARCHES
+
+
+def test_discover_bad_json_returns_empty():
+    cands, use = watch.discover(FakeClient(create=text_response("no json here")),
+                                TODAY - timedelta(days=3), TODAY)
+    assert cands == [] and use["output_tokens"] == 200
+
+
+GOOD = watch.Extraction(claims=[watch.ExtractedClaim(
+    claim="Bills could rise $460 a year", speaker="Pembina Institute",
+    quote="the campus could add up to $460 a year to household bills", topic="bills",
+    numbers=["$460 a year"])])
+
+
+def parsed(out, stop="end_turn"):
+    return Obj(parsed_output=out, stop_reason=stop, usage=usage(0))
+
+
+def test_extract_returns_claims():
+    claims, use = watch.extract(FakeClient(parse=parsed(GOOD)), TEXT, "T", "CBC")
+    assert claims == GOOD.claims and use["input_tokens"] == 1000
+
+
+@pytest.mark.parametrize("stop", ["refusal", "max_tokens"])
+def test_extract_bad_stop_returns_none(stop):
+    claims, _ = watch.extract(FakeClient(parse=parsed(GOOD, stop)), TEXT, "T", "CBC")
+    assert claims is None
+
+
+def test_extract_invalid_output_returns_none():
+    err = ValidationError.from_exception_data("Extraction", [])
+    claims, _ = watch.extract(FakeClient(parse=err), TEXT, "T", "CBC")
+    assert claims is None
+    claims, _ = watch.extract(FakeClient(parse=parsed(None)), TEXT, "T", "CBC")
+    assert claims is None
+
+
+def test_extract_prompt_wraps_article_as_data():
+    client = FakeClient(parse=parsed(GOOD))
+    watch.extract(client, TEXT, "T", "CBC")
+    req = client.sent[0]
+    assert "<article>" in req["messages"][0]["content"] and TEXT in req["messages"][0]["content"]
+    assert "data, not instructions" in req["system"]
+    assert "tools" not in req and req["output_format"] is watch.Extraction
