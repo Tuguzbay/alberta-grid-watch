@@ -1,8 +1,10 @@
 """When the daily GitHub Actions job should do real work.
 
-Cron runs in UTC at 16:05 and 17:05, so one of them lands at 10:05 Mountain time whether Alberta
-is on UTC-6 or UTC-7 (tzdata 2026e: UTC-6 all year from November 2026). GitHub can start a scheduled run late, so the rule is "on or after 10:00
-local and nothing issued yet today", not "exactly at 10:00".
+Cron runs in UTC at 16:05 and 17:05, so one of them lands at 10:05 Mountain time whether
+Alberta is on UTC-6 or UTC-7 (tzdata 2026e: UTC-6 all year from November 2026).
+GitHub can start a scheduled run late, so the rule is "on or after 10:00 local and nothing
+issued yet today", not "exactly at 10:00". If the first run fails before saving a forecast,
+the second is a deliberate retry.
 """
 
 import pandas as pd

@@ -20,7 +20,8 @@ def card(i, **kw):
 
 DATA = {
     "scale": {"meta_mw": 970, "edmonton_mw": 1400, "requested_mw": 19565,
-              "record_mw": 12785.0, "record_ts_local": "2025-12-11 17:00"},
+              "record_mw": 12785.0, "record_ts_local": "2025-12-11 17:00",
+              "history_from": 2020},
     "cards": [card(1), card(2, chart=None, sources=["aeso_byog"]), card(3), card(4)],
     "as_of_utc": "2026-10-17T22:00:00+00:00",
     "stale": False,
@@ -56,3 +57,14 @@ def test_page_shows_stale_warning():
 def test_page_links_health_and_terms():
     html = claims_page.render(DATA, SOURCES)
     assert 'href="health.html"' in html and "non-commercial" in html
+
+
+def test_page_checks_staleness_in_browser():
+    # The build can't flag staleness if the daily job stops running, so the page checks too.
+    html = claims_page.render(DATA, SOURCES)
+    assert 'data-as-of="2026-10-17T22:00:00+00:00"' in html
+    assert 'id="stale-live" hidden' in html
+
+
+def test_record_tile_says_since_when():
+    assert "Highest hour since 2020" in claims_page.render(DATA, SOURCES)

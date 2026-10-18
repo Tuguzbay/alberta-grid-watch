@@ -39,11 +39,17 @@ def _local(ts: pd.Timestamp) -> pd.Timestamp:
     return ts.tz_convert(TZ)
 
 
+def _first_full_day(index: pd.DatetimeIndex) -> pd.Timestamp:
+    first = _local(index.min())
+    return first if first == first.normalize() else first.normalize() + pd.Timedelta(days=1)
+
+
 def scale(df: pd.DataFrame) -> dict:
     load = df["load_mw"].dropna()
     return {"meta_mw": META_MW, "edmonton_mw": FACTS["edmonton_mw"]["value"],
             "requested_mw": FACTS["requested_mw"]["value"], "record_mw": float(load.max()),
-            "record_ts_local": _local(load.idxmax()).strftime("%Y-%m-%d %H:%M")}
+            "record_ts_local": _local(load.idxmax()).strftime("%Y-%m-%d %H:%M"),
+            "history_from": _first_full_day(load.index).year}
 
 
 def reliability_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
@@ -57,30 +63,34 @@ def reliability_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
     year_ago = now - pd.Timedelta(days=365)
     sc = cushion.scenario(h[year_ago:now], df["pool_price"][year_ago:now], META_MW)
     calm = n_this <= n_last
-    daily = h.tz_convert(TZ).groupby(h.index.tz_convert(TZ).date).min().iloc[-90:]
+    # hourly also holds stored forecasts past now; chart only settled history.
+    past = h[:now].tz_convert(TZ)
+    daily = past.groupby(past.index.date).min().dropna().iloc[-90:]
     return {
         "id": "reliability",
         "question": "Will it cause blackouts?",
-        "headline": f"{n_this:,} tight hours in {loc.year} so far",
-        "verdict": "Not so far" if calm else "Getting tighter",
-        "explain": (f"A tight hour is one with no spare gas, hydro or storage capacity left after "
-                    f"meeting demand. Alberta had {n_this:,} this year, against {n_last:,} by "
-                    f"this date last year. If {META_MW} MW ran with no new supply, tight hours "
-                    f"would go from {sc['hours_below_zero_today']:,} to "
+        "headline": f"{n_this:,} hours in {loc.year} when gas, hydro and storage alone fell short",
+        "verdict": "Not so far" if calm else "More hours leaning on wind, solar and imports",
+        "explain": (f"In these hours, available gas, hydro and storage couldn't cover demand on "
+                    f"their own, so wind, solar or imports filled the gap. That's a thinner "
+                    f"cushion, not a blackout. Alberta had {n_this:,} such hours this year, "
+                    f"against {n_last:,} by this date last year. If {META_MW} MW ran with no new "
+                    f"supply, they would go from {sc['hours_below_zero_today']:,} to "
                     f"{sc['hours_headroom_below_zero']:,} a year. This verdict would change if "
-                    f"tight hours {'rise above' if calm else 'fall back to'} last year's pace."),
+                    f"they {'rise above' if calm else 'fall back to'} last year's pace."),
         "chart": {"type": "line", "labels": [str(d) for d in daily.index],
                   "series": {"Lowest spare capacity that day (MW)":
                              [_num(v) for v in daily.values]}},
         "how": [
             "Spare capacity = available dispatchable capability (gas, hydro, storage, other, "
             "after outages) minus Alberta Internal Load, hour by hour, from AESO data.",
-            "Wind, solar and imports aren't counted, so the real cushion is larger than shown.",
+            "Wind, solar and imports aren't counted as cushion, because they can't be called on "
+            "at will. Hours like these are normal on sunny or windy days.",
             "Meta is building its own gas plant next to the campus, which is meant to cover its "
             "load. The what-if assumes it doesn't, so it's a worst case.",
-            "More tight hours doesn't by itself mean data centres caused them: weather, plant "
+            "More of these hours doesn't by itself mean data centres caused them: weather, plant "
             "outages and overall demand growth move this number too.",
-            "Tight hours are a warning sign, not blackouts: AESO has emergency steps first, and "
+            "They're a warning sign, not blackouts: AESO has emergency steps first, and "
             "the government says large loads are cut before homes.",
         ],
         "sources": ["goa_grid", "goa_bills"],
@@ -109,7 +119,8 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
                  f"{share:.1%} of AESO's ${rr / 1e9:,.2f}B transmission cost for 2026, so a cut "
                  f"of that size is {verdict.lower()}. It's an upper bound: total transmission "
                  f"costs also grow, partly to connect new loads.")
-    monthly = p.tz_convert(TZ).groupby(p.index.tz_convert(TZ).strftime("%Y-%m")).mean()
+    past = p[:now].tz_convert(TZ)
+    monthly = past.groupby(past.index.strftime("%Y-%m")).mean().dropna()
     monthly = monthly[monthly.index >= "2020-01"]
     return {
         "id": "bills",
@@ -135,7 +146,7 @@ def emissions_card() -> dict:
     return {
         "id": "emissions",
         "question": "Is it bad for emissions?",
-        "headline": f"{f['co2_mt']:.1f} Mt CO₂ a year",
+        "headline": f"Up to {f['co2_mt']:.1f} Mt CO₂ a year if it all ran on gas",
         "verdict": "Significant" if share >= 0.10 else "Noticeable" if share >= 0.03 else "Small",
         "explain": (f"If all {META_MW} MW ran around the clock on new gas, it would emit about "
                     f"{f['co2_mt']:.1f} million tonnes of CO₂ a year, {share:.0%} of what "

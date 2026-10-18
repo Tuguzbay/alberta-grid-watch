@@ -6,6 +6,7 @@ from html import escape
 import pandas as pd
 
 from gridwatch.features import TZ
+from gridwatch.health import STALE_HOURS
 
 REPO = "https://github.com/Tuguzbay/alberta-grid-watch"
 # Badge colour by what the verdict means for residents; anything else is neutral.
@@ -40,12 +41,16 @@ def render(data: dict, sources: dict[str, dict]) -> str:
     s = data["scale"]
     as_of = pd.Timestamp(data["as_of_utc"]).tz_convert(TZ).strftime("%Y-%m-%d %H:%M")
     stale = (f"<p class='warn' role='alert'>This data isn't up to date: the last settled AESO "
-             f"price is from {escape(as_of)} Mountain time.</p>" if data["stale"] else "")
+             f"price is from {escape(as_of)} Mountain time.</p>" if data["stale"] else
+             # Shown by the script below if the daily job itself stops publishing.
+             f"<p id=\"stale-live\" hidden class='warn' role='alert'>This page hasn't updated "
+             f"in over {STALE_HOURS} hours, so the numbers below may be out of date.</p>")
     tiles = "".join(
         f"<div class='tile'><b>{v:,.0f} MW</b><span>{escape(label)}</span></div>"
         for v, label in ((s["meta_mw"], "Meta campus grid draw"),
                          (s["edmonton_mw"], "City of Edmonton load"),
-                         (s["record_mw"], f"Alberta record hour ({s['record_ts_local']})"),
+                         (s["record_mw"], f"Highest hour since {s['history_from']} "
+                                          f"({s['record_ts_local']})"),
                          (s["requested_mw"], "data-centre load requested")))
     cards = "\n".join(_card(c, sources) for c in data["cards"])
     charts = json.dumps({c["id"]: c["chart"] for c in data["cards"] if c["chart"]})
@@ -102,7 +107,7 @@ The numbers update daily.</p>
 {stale}
 </header>
 <section class="tiles" aria-label="How big is it?">{tiles}</section>
-<main>
+<main data-as-of="{escape(data['as_of_utc'])}">
 {cards}
 </main>
 <footer>
@@ -111,6 +116,11 @@ educational use) and the documents linked on each card. Verdicts come from fixed
 these numbers. Forecast accuracy: <a href="health.html">model track record</a>.
 Code and method: <a href="{REPO}">GitHub</a>.</p>
 </footer>
+<script>
+const asOf = Date.parse(document.querySelector("[data-as-of]").dataset.asOf);
+const live = document.getElementById("stale-live");
+if (live && Date.now() - asOf > {STALE_HOURS} * 3600e3) live.hidden = false;
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const C = {charts};

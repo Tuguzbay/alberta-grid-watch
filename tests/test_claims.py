@@ -35,14 +35,14 @@ def test_scale_record_from_data():
 def test_reliability_verdict_rises():
     df = frame(tight=[("2025-02-01", 10), ("2026-02-01", 100)])
     card = claims.reliability_card(df, NOW)
-    assert card["verdict"] == "Getting tighter"
-    assert "100 tight hours in 2026 so far" in card["headline"]
+    assert card["verdict"] == "More hours leaning on wind, solar and imports"
+    assert card["headline"].startswith("100 hours in 2026 when gas, hydro and storage")
 
 
 def test_reliability_verdict_zero_tight_hours():
     card = claims.reliability_card(frame(), NOW)
     assert card["verdict"] == "Not so far"
-    assert card["headline"] == "0 tight hours in 2026 so far"
+    assert card["headline"].startswith("0 hours in 2026 when")
     assert not any(bad in s for s in strings(card) for bad in ("nan", "inf"))
 
 
@@ -84,3 +84,25 @@ def test_reliability_change_condition_matches_verdict():
     tighter = claims.reliability_card(frame(tight=[("2026-02-01", 100)]), NOW)
     assert "fall back to last year's pace" in tighter["explain"]
     assert "rise above" in claims.reliability_card(frame(), NOW)["explain"]
+
+
+def test_reliability_card_says_what_it_measures():
+    text = claims.reliability_card(frame(tight=[("2026-02-01", 100)]), NOW)["explain"]
+    assert "wind, solar or imports" in text and "no spare" not in text
+
+
+def test_charts_stop_at_now():
+    df = frame(end="2026-10-18 23:00")  # hourly also holds stored forecasts past now
+    for card in claims.cards(df, NOW)["cards"]:
+        if card["chart"]:
+            assert card["chart"]["labels"][-1] <= "2026-10-16", card["id"]
+            values = next(iter(card["chart"]["series"].values()))
+            assert values and None not in values, card["id"]
+
+
+def test_emissions_headline_is_conditional():
+    assert claims.emissions_card()["headline"].startswith("Up to ")
+
+
+def test_scale_reports_history_start():
+    assert claims.scale(frame())["history_from"] == 2024

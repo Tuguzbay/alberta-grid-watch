@@ -35,20 +35,23 @@ jobs:
         run: python scripts/daily.py
       - if: steps.guard.outputs.run == 'true'
         run: python scripts/build_site.py
+      # Upload first: the snapshot commit and re-enable are best effort and mustn't block deploy.
+      - if: steps.guard.outputs.run == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with: { path: site }
       - name: Commit snapshot (keeps the repo active for GitHub's 60-day schedule rule)
         if: steps.guard.outputs.run == 'true'
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add snapshots
-          git diff --cached --quiet || { git commit -m "snapshot $(TZ=America/Edmonton date +%F)" && git push; }
+          git diff --cached --quiet || { git commit -m "snapshot $(TZ=America/Edmonton date +%F)" && git pull --rebase && git push; }
       - name: Re-enable this workflow (belt and braces for the 60-day rule)
         if: steps.guard.outputs.run == 'true'
+        continue-on-error: true
         env: { GH_TOKEN: "${{ github.token }}" }
         run: gh workflow enable daily.yml
-      - if: steps.guard.outputs.run == 'true'
-        uses: actions/upload-pages-artifact@v3
-        with: { path: site }
   deploy:
     needs: build
     if: needs.build.outputs.run == 'true'
