@@ -10,9 +10,10 @@ Status and next steps: [PROGRESS.md](PROGRESS.md).
 
 ## Parts
 1. **Claims page** (the live site): four questions (blackouts, power bills, emissions, water), each with a headline number, a rule-based verdict, a chart, "How we know" and its sources, plus a "How big is it?" scale strip. Broadsheet-meets-product-page design, light/dark switch.
-2. **Claim watch**: every day, Claude Haiku finds new articles and changed official documents and extracts the claims they make. A claim is published only if its quote appears word for word in the source. Shown in "Spotted this week" and inside each card.
-3. **Pool price & demand forecasting**: next-day hourly forecasts against simple baselines, with a model-health page (`health.html`).
-4. **Document search**: an extractive `/api/ask` over 18 AESO, AUC and Government of Alberta documents. It runs locally and isn't on the public page.
+   - **Meta's size:** per the government's [By the numbers](https://www.alberta.ca/datacentres/numbers) page, **970 MW** is Meta's AESO-approved phase 1 grid allocation and **1,800 MW** the campus draw at full build-out (grid plus on-site generation, no date given). The Greenlight gas plant is 932 MW nameplate. The blackouts card and scale strip use 970 MW (what the grid carries). Emissions and water headlines are phase 1, with the full build-out figure beside them.
+2. **Claim watch**: every day, Claude Haiku finds new articles and changed official documents and extracts the claims they make. A claim is published only if its quote appears word for word in the source. Shown in "Spotted this week" (a swipeable carousel) and inside each card. Each card leads with the verified quote; Haiku's one-line summary follows, marked "AI summary". Source links open the article scrolled to the quote and highlight it.
+3. **Pool price & demand forecasting**: next-day hourly forecasts against simple baselines, with a model-health page (`health.html`, same look as the claims page).
+4. **Document search**: an extractive `/api/ask` over the AESO, AUC and Government of Alberta documents in [rag/sources.csv](rag/sources.csv). It runs locally and isn't on the public page.
 
 ## Data sources
 | Source | Use | Terms |
@@ -54,7 +55,7 @@ powershell -File scripts/register_task.ps1   # old Windows task (superseded by G
 GitHub Actions, daily at 10:05 Mountain time (.github/workflows/daily.yml)
   should_run.py   guard: after 10:00 local and not yet issued today (or a manual run)
   daily.py        AESO + Open-Meteo -> Supabase `hourly`; next-day forecast -> `forecasts`
-  watch.py        18 official docs re-checked (visible-text fingerprint)
+  watch.py        19 official docs re-checked (visible-text fingerprint)
                   + Haiku web search -> our fetch -> Haiku extraction -> whole-word quote check
                   -> `articles` / `claims`
   build_site.py   claims.py (numbers + verdict rules) + claims_page.py -> site/index.html
@@ -158,7 +159,15 @@ Caveats:
 - **Some sources are advocacy.** The Government of Alberta datacentres pages are written to persuade (for example, "Not one dollar ... is charged to your household"). Every passage shows its publisher, so you can weigh it.
 
 ## Claim watch: new claims from the news, checked word for word
-Every day, Claude Haiku (via Anthropic's web search tool) looks for new articles about Meta's Alberta data centre and Alberta data-centre policy, and re-reads the tracked official documents. The job downloads each article itself and asks Haiku for the claims it makes, each with a quote. **A claim is published only if its quote appears word for word in the article** (after normalising quotes and spacing). Haiku never judges truth: every claim shows "Not checked yet", its source and its quote, under a label saying it was extracted by AI and not reviewed. Bad claims can be hidden by id (`rag/hidden_claims.txt`). Capped at 3 searches and 8 articles a day, about $1–3/month.
+Every day, Claude Haiku (via Anthropic's web search tool) looks for new articles about Meta's Alberta data centre and Alberta data-centre policy, and re-reads the tracked official documents. The job downloads each article itself and asks Haiku for the claims it makes, each with a quote. **A claim is published only if its quote appears word for word in the article** (after normalising quotes and spacing). Haiku never judges truth: every claim shows "Not checked yet", its source and its quote, under a label saying it was extracted by AI and not reviewed. Bad claims can be hidden by id (`rag/hidden_claims.txt`); hiding also covers the same quote under any other URL, such as a wire story on another outlet. Capped at 3 searches and 8 articles a day, about $1–3/month.
+
+Guards:
+- **Downloads:** capped at 25 MB, and only from hosts with public addresses.
+- **Duplicates:** http/https and `www.` variants of a URL count as one article.
+- **Changed documents:** when an official document changes, its claims whose quote is gone are dropped.
+- **Cost:** extraction calls `messages.create` with a JSON schema and validates the answer itself, so the cost summary also counts the tokens of answers that get rejected.
+
+Source links use a URL text fragment (`#:~:text=start,end`). The anchors skip words containing quote marks or brackets, because pages use curly apostrophes where our text has straight ones. They work in Chrome, Edge, Safari and Firefox 131+; older browsers open the top of the page.
 
 First real run (2026-10-18): 4 articles found (1 blocked by its publisher), 17 claims, 0 quotes rejected, $0.093. On a manual read, 2 summaries overstated their quote ("invested" for "plans to invest"), so they were hidden and the prompt was tightened. The quote check protects the quote, not the summary.
 
