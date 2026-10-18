@@ -37,9 +37,12 @@ def scenario(h: pd.Series, price: pd.Series, added_mw: float, min_hours: int = 2
     """
     c = curve(h, price)
     reliable = c[c["hours"] >= min_hours]
-    lo = reliable.index.min()
     ok = h.notna() & price.notna()
     h = h[ok]
+    if reliable.empty:  # e.g. a fresh database: count hours, but no prices can be read
+        reliable = pd.DataFrame({"mean_price": [float("nan")], "spike_share": [float("nan")],
+                                 "hours": [0]}, index=[0])
+    lo = reliable.index.min()
 
     def lookup(x: pd.Series) -> pd.DataFrame:
         bins = (x // BIN_MW * BIN_MW).clip(lower=lo).astype(int)

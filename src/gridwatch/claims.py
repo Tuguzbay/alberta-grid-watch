@@ -105,9 +105,11 @@ def reliability_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
 def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
     p = df["pool_price"]
     yr = pd.Timedelta(days=365)
-    cur, prev = p[now - yr:now].mean(), p[now - 2 * yr:now - yr].mean()
+    before = p[now - 2 * yr:now - yr]
+    cur, prev = p[now - yr:now].mean(), before.mean()
     headline = f"${cur:,.0f}/MWh over the last year"
-    if prev and not math.isnan(prev) and not math.isnan(cur):
+    full_year = before.count() >= 0.9 * 365 * 24  # a part-year isn't "the year before"
+    if full_year and prev and not math.isnan(prev) and not math.isnan(cur):
         change = cur / prev - 1
         headline += f", {'up' if change >= 0 else 'down'} {abs(change):.0%} on the year before"
     rr = FACTS["transmission_rr"]["value"]
@@ -121,9 +123,12 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
         verdict = "Plausible" if share >= 0.06 else "Overstated" if share < 0.03 else "Partly true"
         check = (f"The government says Meta's ~${fees / 1e6:,.0f}M a year in transmission fees "
                  f"will cut the transmission part of household bills by up to 6%. That's "
-                 f"{share:.1%} of AESO's ${rr / 1e9:,.2f}B transmission cost for 2026, so a cut "
-                 f"of that size is {verdict.lower()}. It's an upper bound: total transmission "
-                 f"costs also grow, partly to connect new loads.")
+                 f"{share:.1%} of AESO's ${rr / 1e9:,.2f}B transmission cost for 2026, so "
+                 + {"Plausible": "a 6% cut is plausible",
+                    "Partly true": "the fees could cover only part of a 6% cut",
+                    "Overstated": "a 6% cut looks overstated"}[verdict]
+                 + ". It's an upper bound: total transmission "
+                 "costs also grow, partly to connect new loads.")
     past = p[:now].tz_convert(TZ)
     monthly = past.groupby(past.index.strftime("%Y-%m")).mean().dropna()
     monthly = monthly[monthly.index >= "2020-01"]
@@ -205,7 +210,8 @@ def water_card() -> dict:
 
 
 def cards(df: pd.DataFrame, now: pd.Timestamp) -> dict:
-    last = df["pool_price"].dropna().index.max()
+    # The older of the two: the page is only as fresh as its stalest input.
+    last = min(df[c][:now].dropna().index.max() for c in ("pool_price", "load_mw"))
     return {
         "scale": scale(df),
         "cards": [reliability_card(df, now), bills_card(df, now), emissions_card(),

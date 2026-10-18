@@ -201,3 +201,36 @@ def test_public_host_rejects_internal_addresses():
     assert not watch.public_host("http://localhost:5432/x")
     assert not watch.public_host("http://10.0.0.5/a")
     assert watch.public_host("https://8.8.8.8/")
+
+
+def test_discover_joins_answer_split_by_citations():
+    parts = ['{"articles": [{"url": "https://cbc.ca/a", ', '"title": "T", "outlet": "CBC", ',
+             '"published": "2026-10-17"}]}']
+    resp = Obj(content=[Obj(type="text", text="Searching {first}"), Obj(type="server_tool_use"),
+                        *(Obj(type="text", text=p) for p in parts)],
+               stop_reason="end_turn", usage=usage())
+    cands, _ = watch.discover(FakeClient(create=resp), TODAY, TODAY)
+    assert [c.url for c in cands] == ["https://cbc.ca/a"]
+
+
+def test_filter_treats_www_and_http_as_same_article():
+    c = watch.Candidate(url="http://www.cbc.ca/a", title="T", outlet="CBC", published=TODAY)
+    assert watch.filter_candidates([c], {"https://cbc.ca/a"}, TODAY, TODAY) == []
+
+
+def test_fetch_stops_at_size_cap(monkeypatch):
+    import contextlib
+
+    import httpx
+
+    from gridwatch import rag
+
+    @contextlib.contextmanager
+    def stream(method, url, **kw):
+        yield Obj(raise_for_status=lambda: None, iter_bytes=lambda: iter([b"x" * 600] * 3))
+    monkeypatch.setattr(httpx, "stream", stream)
+    monkeypatch.setattr(rag, "MAX_BYTES", 1000)
+    with pytest.raises(ValueError, match="over"):
+        rag.fetch("https://cbc.ca/huge")
+    monkeypatch.setattr(rag, "MAX_BYTES", 5000)
+    assert len(rag.fetch("https://cbc.ca/ok")) == 1800

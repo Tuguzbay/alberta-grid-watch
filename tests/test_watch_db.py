@@ -210,3 +210,23 @@ def test_run_skips_internal_urls(conn):
     client, _ = fake_client(["http://169.254.169.254/latest", "https://cbc.ca/ok"], [CLAIM])
     s = watch.run(conn, client, NOW, fetch=lambda url: fetched.append(url) or ARTICLE)
     assert fetched == ["https://cbc.ca/ok"] and s["unreadable"] == 1
+
+
+def test_changed_document_drops_claims_whose_quote_is_gone(conn):
+    save(conn)
+    other = CLAIM.model_copy(update={"quote": "this sentence was in the old version of the page"})
+    watch.save_claims(conn, URL, [CLAIM, other])
+    assert watch.drop_stale_claims(conn, URL, f"Pembina: {CLAIM.quote}.") == 1
+    rows = watch.recent_claims(conn, datetime(2026, 10, 1, tzinfo=UTC), hidden=set())
+    assert [r["quote"] for r in rows] == [CLAIM.quote]
+
+
+def test_run_clamps_since_after_a_long_gap(conn):
+    watch.save_article(conn, "https://cbc.ca/old", "T", "CBC", date(2026, 1, 1), "ok", "news")
+    conn.execute("UPDATE articles SET fetched_at = '2026-01-01'")
+    sent = []
+    client, _ = fake_client([], [])
+    create = client.messages.create
+    client.messages.create = lambda **kw: sent.append(kw) or create(**kw)
+    watch.run(conn, client, NOW, fetch=lambda url: ARTICLE)
+    assert str(NOW.date() - timedelta(days=watch.WINDOW_DAYS)) in sent[0]["messages"][0]["content"]

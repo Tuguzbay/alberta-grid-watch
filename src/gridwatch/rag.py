@@ -95,10 +95,18 @@ def _vec(v) -> str:
     return "[" + ",".join(f"{x:.6f}" for x in v) + "]"
 
 
+MAX_BYTES = 25_000_000  # well above any source PDF; stops a huge or endless response
+
+
 def fetch(url: str) -> bytes:
-    r = httpx.get(url, headers=UA, follow_redirects=True, timeout=60)
-    r.raise_for_status()
-    return r.content
+    with httpx.stream("GET", url, headers=UA, follow_redirects=True, timeout=60) as r:
+        r.raise_for_status()
+        body = bytearray()
+        for chunk in r.iter_bytes():
+            body += chunk
+            if len(body) > MAX_BYTES:
+                raise ValueError(f"response over {MAX_BYTES:,} bytes")
+    return bytes(body)
 
 
 def text_sha(content: bytes) -> str:

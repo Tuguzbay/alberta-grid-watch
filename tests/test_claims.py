@@ -106,3 +106,16 @@ def test_emissions_headline_is_conditional():
 
 def test_scale_reports_history_start():
     assert claims.scale(frame())["history_from"] == 2024
+
+
+def test_bills_skips_year_on_year_without_a_full_year_before():
+    df = frame()
+    assert "on the year before" in claims.bills_card(df, NOW)["headline"]
+    short = df["2025-06-01":]
+    assert "on the year before" not in claims.bills_card(short, NOW)["headline"]
+
+
+def test_stale_when_load_stops_updating():
+    df = frame()
+    df.loc["2026-10-14":, "load_mw"] = float("nan")
+    assert claims.cards(df, NOW)["stale"] and not claims.cards(frame(), NOW)["stale"]

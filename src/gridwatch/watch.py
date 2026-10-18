@@ -95,15 +95,21 @@ def public_host(url: str) -> bool:
     return bool(infos) and all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
 
 
+def same_page(url: str) -> str:
+    """Dedupe key: http/https and a leading www. don't make a different article."""
+    p = urlsplit(url)
+    return urlunsplit(("", p.netloc.removeprefix("www."), p.path, p.query, ""))
+
+
 def filter_candidates(cands: list[Candidate], seen: set[str], since: date, today: date,
                       limit: int = MAX_ARTICLES) -> list[Candidate]:
     """New, in-window candidates with canonical URLs, newest first, at most `limit`."""
     lo = max(since, today - timedelta(days=WINDOW_DAYS))
-    out, taken = [], set(seen)
+    out, taken = [], {same_page(u) for u in seen}
     for c in sorted(cands, key=lambda c: c.published, reverse=True):
         url = canonical_url(c.url)
-        if url and url not in taken and lo <= c.published <= today:
-            taken.add(url)
+        if url and same_page(url) not in taken and lo <= c.published <= today:
+            taken.add(same_page(url))
             out.append(c.model_copy(update={"url": url}))
     return out[:limit]
 
@@ -160,7 +166,12 @@ def discover(client, since: date, today: date) -> tuple[list[Candidate], dict]:
         model=MODEL, max_tokens=4000,
         tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": MAX_SEARCHES}],
         messages=[{"role": "user", "content": DISCOVER_PROMPT.format(since=since, today=today)}])
-    text = next((b.text for b in reversed(resp.content) if b.type == "text"), "")
+    tail = []  # the answer is the text after the last search; citations split it into blocks
+    for b in reversed(resp.content):
+        if b.type != "text":
+            break
+        tail.append(b.text)
+    text = "".join(reversed(tail))
     # The answer is meant to be bare JSON; tolerate prose or code fences around it.
     start, end = text.find("{"), text.rfind("}")
     try:
@@ -225,6 +236,15 @@ def save_claims(conn: psycopg.Connection, url: str, claims: list[ExtractedClaim]
     return n
 
 
+def drop_stale_claims(conn: psycopg.Connection, url: str, text: str) -> int:
+    """Delete this document's claims whose quote no longer appears in its new text."""
+    rows = conn.execute("SELECT id, quote FROM claims WHERE article_url = %s", (url,)).fetchall()
+    gone = [i for i, q in rows if not quote_in_text(q, text)]
+    if gone:
+        conn.execute("DELETE FROM claims WHERE id = ANY(%s)", (gone,))
+    return len(gone)
+
+
 def recent_claims(conn: psycopg.Connection, since: datetime, hidden: set[str]) -> list[dict]:
     cur = conn.execute(
         "SELECT c.id, c.claim, c.speaker, c.quote, c.topic, c.numbers, a.url, a.title, a.outlet,"
@@ -277,7 +297,8 @@ def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
     fetch = fetch or rag.fetch
     today = now.date()
     s = dict.fromkeys(["candidates", "new_articles", "official_changed", "unreadable", "too_long",
-                       "extract_failed", "claims_saved", "quotes_rejected", "input_tokens",
+                       "extract_failed", "claims_saved", "quotes_rejected", "claims_dropped",
+                       "input_tokens",
                        "output_tokens", "searches"], 0)
 
     def add_usage(use: dict) -> None:
@@ -312,6 +333,8 @@ def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
                 s["quotes_rejected"] += len(claims) - len(kept)
         if status != "ok":
             s[status] += 1
+        elif kind == "official":
+            s["claims_dropped"] += drop_stale_claims(conn, url, text)
         save_article(conn, url, title, outlet, published, status, kind)
         s["claims_saved"] += save_claims(conn, url, kept)
         conn.commit()  # one article at a time: a later failure can't undo earlier work
@@ -328,7 +351,8 @@ def run(conn: psycopg.Connection, client, now: datetime, fetch=None,
                     today, "official", raw.read_bytes() if raw.exists() else None)
 
     last = last_run(conn)
-    since = last - timedelta(days=SLACK_DAYS) if last else today - timedelta(days=WINDOW_DAYS)
+    since = max(last - timedelta(days=SLACK_DAYS) if last else date.min,
+                today - timedelta(days=WINDOW_DAYS))
     found, use = discover(client, since, today)
     add_usage(use)
     s["candidates"] = len(found)
