@@ -8,10 +8,12 @@ Haiku extracts and categorises; it never judges whether a claim is true.
 import hashlib
 import re
 import unicodedata
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+import psycopg
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ValidationError
 
 MODEL = "claude-haiku-4-5"
@@ -160,3 +162,59 @@ def extract(client, text: str, title: str, outlet: str
         return None, {"input_tokens": 0, "output_tokens": 0, "searches": 0}
     ok = resp.stop_reason not in ("refusal", "max_tokens") and resp.parsed_output is not None
     return (resp.parsed_output.claims if ok else None), _usage(resp)
+
+
+# --- storage -------------------------------------------------------------------------------
+
+def seen_urls(conn: psycopg.Connection) -> set[str]:
+    return {r[0] for r in conn.execute("SELECT url FROM articles")}
+
+
+def last_run(conn: psycopg.Connection) -> date | None:
+    """Date of the latest news fetch (UTC), or None before the first run."""
+    row = conn.execute("SELECT max(fetched_at AT TIME ZONE 'UTC')::date FROM articles"
+                       " WHERE source_kind = 'news'").fetchone()
+    return row[0]
+
+
+def save_article(conn: psycopg.Connection, url: str, title: str, outlet: str,
+                 published: date | None, status: str, source_kind: str) -> None:
+    conn.execute(
+        "INSERT INTO articles (url, title, outlet, published, status, source_kind)"
+        " VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (url) DO UPDATE SET title = EXCLUDED.title,"
+        " outlet = EXCLUDED.outlet, published = EXCLUDED.published, status = EXCLUDED.status,"
+        " fetched_at = now()", (url, title, outlet, published, status, source_kind))
+
+
+def save_claims(conn: psycopg.Connection, url: str, claims: list[ExtractedClaim]) -> int:
+    """Insert claims for an article; returns how many were new."""
+    n = 0
+    for c in claims:
+        cur = conn.execute(
+            "INSERT INTO claims (id, article_url, claim, speaker, quote, topic, numbers, model)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
+            (claim_id(url, c.quote), url, c.claim, c.speaker, c.quote, c.topic, Jsonb(c.numbers),
+             MODEL))
+        n += cur.rowcount
+    return n
+
+
+def recent_claims(conn: psycopg.Connection, since: datetime, hidden: set[str]) -> list[dict]:
+    cur = conn.execute(
+        "SELECT c.id, c.claim, c.speaker, c.quote, c.topic, c.numbers, a.url, a.title, a.outlet,"
+        " a.published, a.source_kind FROM claims c JOIN articles a ON a.url = c.article_url"
+        " WHERE c.extracted_at >= %s ORDER BY a.published DESC NULLS LAST, c.extracted_at DESC",
+        (since,))
+    cols = [d.name for d in cur.description]
+    rows = [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+    for r in rows:
+        r["published"] = r["published"].isoformat() if r["published"] else None
+    return [r for r in rows if r["id"] not in hidden]
+
+
+def changed_sources(conn: psycopg.Connection, since: date) -> list[dict]:
+    cur = conn.execute("SELECT key, title, publisher, url, changed_on FROM documents"
+                       " WHERE changed_on >= %s ORDER BY changed_on DESC", (since,))
+    cols = [d.name for d in cur.description]
+    return [dict(zip(cols, r[:-1], strict=False)) | {"changed_on": r[-1].isoformat()}
+            for r in cur.fetchall()]
