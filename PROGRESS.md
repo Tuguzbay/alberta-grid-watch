@@ -1,6 +1,6 @@
 # Progress & next steps
 
-_Last updated: 2026-10-17._ This is the hand-off file: read it first when resuming.
+_Last updated: 2026-10-18._ This is the hand-off file: read it first when resuming.
 
 ## Status
 
@@ -15,6 +15,15 @@ _Last updated: 2026-10-17._ This is the hand-off file: read it first when resumi
 | 6 | Deploy: Supabase, hosted API, GitHub Actions schedule, architecture diagram | ⬜ |
 
 Repo: https://github.com/Tuguzbay/alberta-grid-watch (public). Push over HTTPS (Git Credential Manager); there's no SSH key on this PC.
+
+## Live site
+https://tuguzbay.github.io/alberta-grid-watch/ is rebuilt daily by `.github/workflows/daily.yml`: data update → claim watch → page build → snapshot commit → Pages deploy. Secrets: `AESO_API_KEY`, `DATABASE_URL` (Supabase session pooler), `ANTHROPIC_API_KEY`. Locally, `.env` holds `SUPABASE_URL` (production) next to `DATABASE_URL` (Docker).
+
+### Claim watch (added 2026-10-18)
+- `scripts/watch.py`: Haiku web search finds new articles (≤3 searches) → our code downloads them (≤8/day) → Haiku extracts claims → **each quote must appear word-for-word** in the article or the claim is dropped → stored in `articles`/`claims`. Also re-checks the 18 tracked documents; a change in visible text (not markup) sets `documents.changed_on`, and up to 3 changed documents a day are extracted.
+- Cost: the first real run was $0.093 (3 searches, 4 articles, 17 claims, 0 quotes rejected). Expect ≈ $1–3/month. A spend limit is set in the Anthropic Console.
+- **To hide a bad claim:** add its id (from `site/data.json` → `watch.claims[].id`, or the `claims` table) to `rag/hidden_claims.txt` and push; the next build drops it.
+- The first run hid 2 of 17 claims whose summary overstated the quote; the extraction prompt was tightened after that. Read new claims now and then: the quote check guarantees the quote, not the summary.
 
 ## What runs by itself
 

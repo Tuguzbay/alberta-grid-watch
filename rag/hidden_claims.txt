@@ -1,0 +1,5 @@
+# One claim id per line; hidden from the page. Ids are shown in data.json (watch.claims[].id).
+# 2026-10-18 first real run: summaries overstated their quotes (quote said "plans to invest" /
+# "announced", not invested / groundbreaking).
+3b82b3d66561b247
+5b3035d1546bbc41

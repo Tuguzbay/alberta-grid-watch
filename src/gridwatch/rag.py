@@ -11,6 +11,7 @@ from datetime import date
 from functools import cache
 from html.parser import HTMLParser
 from io import BytesIO
+from pathlib import Path
 
 import httpx
 import psycopg
@@ -100,23 +101,35 @@ def fetch(url: str) -> bytes:
     return r.content
 
 
+def text_sha(content: bytes) -> str:
+    """Fingerprint of a document's visible text, ignoring markup and whitespace."""
+    text = " ".join(" ".join(t.split()) for _, t in pages(content))
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def store(conn: psycopg.Connection, src: dict, content: bytes, force: bool = False) -> int | None:
     """Replace one document and its chunks. Returns the chunk count, or None if unchanged.
 
     force re-chunks an unchanged file, for when chunking or the model changed."""
-    sha = hashlib.sha256(content).hexdigest()
-    row = conn.execute("SELECT sha256 FROM documents WHERE key = %s", (src["key"],)).fetchone()
-    if row and row[0] == sha and not force:
-        return None
+    sha, tsha = hashlib.sha256(content).hexdigest(), text_sha(content)
+    row = conn.execute("SELECT sha256, changed_on, text_sha FROM documents WHERE key = %s",
+                       (src["key"],)).fetchone()
+    if row and sha == row[0] or row and tsha == row[2]:  # same file, or same visible text
+        if row[2] is None:  # rows stored before text fingerprints: fill it in now
+            conn.execute("UPDATE documents SET text_sha = %s WHERE key = %s", (tsha, src["key"]))
+        if not force:
+            return None
+    # Only a different visible text, compared with a known earlier fingerprint, is a change.
+    changed_on = date.today() if row and row[2] and row[2] != tsha else (row[1] if row else None)
     chunks = chunk(pages(content))
     vecs = list(_model().passage_embed([t for _, t in chunks]))
     with conn.transaction():
         conn.execute("DELETE FROM documents WHERE key = %s", (src["key"],))
         conn.execute(
-            "INSERT INTO documents (key, publisher, title, published, url, retrieved_on, sha256)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "INSERT INTO documents (key, publisher, title, published, url, retrieved_on, sha256,"
+            " changed_on, text_sha) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (src["key"], src["publisher"], src["title"], src["published"] or None, src["url"],
-             date.today(), sha))
+             date.today(), sha, changed_on, tsha))
         with conn.cursor() as cur:
             cur.executemany(
                 "INSERT INTO chunks (doc_key, ord, page, text, embedding)"
@@ -124,6 +137,34 @@ def store(conn: psycopg.Connection, src: dict, content: bytes, force: bool = Fal
                 [(src["key"], i, p, t, _vec(v))
                  for i, ((p, t), v) in enumerate(zip(chunks, vecs, strict=True))])
     return len(chunks)
+
+
+def ingest_all(conn: psycopg.Connection, sources: list[dict], raw_dir: Path,
+               force: bool = False) -> list[str]:
+    """Fetch and store every source; returns keys whose content changed (not first inserts).
+
+    Documents no longer in `sources` are deleted. Raw files are kept in raw_dir."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    conn.execute("DELETE FROM documents WHERE key <> ALL(%s)", ([s["key"] for s in sources],))
+    changed = []
+    for src in sources:
+        try:
+            content = fetch(src["url"])
+        except Exception as e:  # one dead link shouldn't stop the rest
+            print(f"{src['key']:24} FETCH FAILED: {e}")
+            continue
+        (raw_dir / src["key"]).write_bytes(content)
+        prev = conn.execute("SELECT text_sha FROM documents WHERE key = %s",
+                            (src["key"],)).fetchone()
+        n = store(conn, src, content, force=force)
+        if prev and prev[0] and prev[0] != text_sha(content):
+            changed.append(src["key"])
+        words = sum(len(t.split()) for _, t in pages(content))
+        status = "unchanged" if n is None else f"{n} chunks"
+        # Few words usually means a JS-rendered page or a soft 404: check by hand.
+        check = "  CHECK: little text" if words < 150 else ""
+        print(f"{src['key']:24} {words:6} words  {status}{check}")
+    return changed
 
 
 def retrieve(conn: psycopg.Connection, question: str, k: int = 5) -> list[dict]:

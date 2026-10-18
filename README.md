@@ -6,6 +6,8 @@ A public tool that uses real data to answer what large new loads, like proposed 
 
 Status and next steps: [PROGRESS.md](PROGRESS.md).
 
+**Live:** https://tuguzbay.github.io/alberta-grid-watch/ ("Meta in Alberta: claims vs data", rebuilt daily)
+
 ## Parts
 1. **Pool price & demand forecasting**: next-day hourly forecasts compared against simple baselines, with a public model-health page. *(Phases 1–3)*
 2. **Document search**: ask a question and get the best-matching passages from 17 AESO, AUC and Government of Alberta documents, each with its source and page. It's extractive (no generated text) and abstains when nothing matches well enough. *(Phase 4)*
@@ -136,4 +138,9 @@ Caveats:
 - **Tuned in-sample.** The threshold was picked on these same 34 questions, so expect worse on new ones. The scores are tightly bunched, so rewording a question can drop it under the line. "Why did the AUC *reject* the Olds power plant?" scores 0.674 and gets abstained on, while "...*deny* the Synapse power plant in Olds?" scores 0.768.
 - **Similarity measures topic, not whether the answer is there.** "What is the AESO's total transmission revenue requirement for 2026?" isn't answered by any document, but it scores 0.77 against the connection guide, so the search returns off-target passages instead of abstaining. Read the passage before you trust it.
 - **Some sources are advocacy.** The Government of Alberta datacentres pages are written to persuade (for example, "Not one dollar ... is charged to your household"). Every passage shows its publisher, so you can weigh it.
+
+## Claim watch: new claims from the news, checked word for word
+Every day, Claude Haiku (via Anthropic's web search tool) looks for new articles about Meta's Alberta data centre and Alberta data-centre policy, and re-reads the tracked official documents. The job downloads each article itself and asks Haiku for the claims it makes, each with a quote. **A claim is published only if its quote appears word for word in the article** (after normalising quotes and spacing). Haiku never judges truth: every claim shows "Not checked yet", its source and its quote, under a label saying it was extracted by AI and not reviewed. Bad claims can be hidden by id (`rag/hidden_claims.txt`). Capped at 3 searches and 8 articles a day, about $1–3/month.
+
+First real run (2026-10-18): 4 articles found (1 blocked by its publisher), 17 claims, 0 quotes rejected, $0.093. On a manual read, 2 summaries overstated their quote ("invested" for "plans to invest"), so they were hidden and the prompt was tightened. The quote check protects the quote, not the summary.
 

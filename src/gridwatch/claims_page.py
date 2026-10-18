@@ -8,6 +8,7 @@ imitating neither: no logos, and the page says it isn't affiliated with Meta.
 import json
 import re
 from html import escape
+from urllib.parse import urlsplit
 
 import pandas as pd
 
@@ -37,6 +38,72 @@ SUN = ("<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='4
 MOON = "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z'/></svg>"  # noqa: E501
 
 
+TOPIC_LABEL = {"bills": "Bills", "reliability": "Reliability", "emissions": "Emissions",
+               "water": "Water", "land_community": "Land & community",
+               "jobs_economy": "Jobs & economy", "other": "Other"}
+CARD_LABEL = {"bills": "Power bills", "reliability": "Blackouts", "emissions": "Emissions",
+              "water": "Water"}
+AI_LABEL = ("Found and summarised automatically by AI (Claude Haiku) from public articles. "
+            "Not reviewed by a person. Quotes are checked word-for-word against the source.")
+
+
+def _safe_url(url: str) -> str:
+    """Only http(s) links reach the page; anything else renders as plain text."""
+    return url if url.lower().startswith(("http://", "https://")) else ""
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def _claim(c: dict, related: bool = True) -> str:
+    url = _safe_url(c["url"])
+    source = escape(f"{c['outlet']} · {c['published'] or 'date unknown'}")
+    link = f"<a href=\"{escape(url)}\">{source}</a>" if url else source
+    # The outlet name comes from the AI; the hostname shows where the link really goes.
+    host = urlsplit(url).hostname if url else None
+    if host:
+        link += f" <span class=\"host\">{escape(host.removeprefix('www.'))}</span>"
+    card = c["topic"] if c["topic"] in CARD_LABEL else None
+    rel = (f"<a class=\"rel\" href=\"#{card}\">Related data: see {CARD_LABEL[card]} ↓</a>"
+           if related and card else "")
+    topic = escape(TOPIC_LABEL.get(c["topic"], "Other"))
+    return (f"<li class=\"claim\"><p class=\"what\">{escape(c['claim'])}</p>"
+            f"<blockquote>{escape(c['quote'])}</blockquote>"
+            f"<p class=\"who\">{escape(c['speaker'])} · {link}</p>"
+            f"<p class=\"tags\"><span class=\"tag\">{topic}</span>"
+            f"<span class=\"chip neutral\">Not checked yet</span>{rel}</p></li>")
+
+
+def _changed(s: dict) -> str:
+    url = _safe_url(s["url"])
+    title = f"<a href=\"{escape(url)}\">{escape(s['title'])}</a>" if url else escape(s["title"])
+    return f"<li>{escape(s['publisher'])}, {title}, changed on {escape(s['changed_on'])}</li>"
+
+
+def _spotted(w: dict) -> str:
+    n, m = w.get("week_count", 0), w.get("week_sources", 0)
+    head = (f"{_plural(n, 'new claim')} from {_plural(m, 'source')} this week" if n
+            else "No new claims this week.")
+    items = "".join(_claim(c) for c in w.get("claims", []))
+    lines = "".join(_changed(s) for s in w.get("changed_sources", []))
+    return (f"<section id=\"spotted\" class=\"spotted reveal\" aria-labelledby=\"spotted-h\">"
+            f"<h2 class=\"kicker\" id=\"spotted-h\">Spotted this week</h2>"
+            f"<p class=\"spot-head\">{escape(head)}</p><p class=\"ai\">{AI_LABEL}</p>"
+            + (f"<ol class=\"claims\">{items}</ol>" if items else "")
+            + (f"<h3>Official sources changed</h3><ul class=\"changed\">{lines}</ul>"
+               if lines else "")
+            + "</section>")
+
+
+def _recent(claims: list[dict]) -> str:
+    if not claims:
+        return ""
+    items = "".join(_claim(c, related=False) for c in claims)
+    return (f"<div class=\"recent\"><h3>Recent claims on this topic ({len(claims)})</h3>"
+            f"<ol class=\"claims\">{items}</ol></div>")
+
+
 def _split(text: str) -> tuple[str, str]:
     """First sentence (the short answer) and the rest."""
     parts = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)
@@ -53,11 +120,14 @@ def _chip(verdict: str) -> str:
     return f"<span class=\"chip {TONE.get(verdict, 'neutral')}\">{escape(verdict)}</span>"
 
 
-def _glance(cards: list[dict]) -> str:
+def _glance(cards: list[dict], w: dict) -> str:
+    spotted = (f"<li><a href=\"#spotted\"><span class=\"num\">{len(cards) + 1:02d}</span>"
+               f"<span class=\"q\">Spotted this week</span><span class=\"chip neutral\">"
+               f"{_plural(w.get('week_count', 0), 'new claim')}</span></a></li>")
     rows = "".join(
         f"<li><a href=\"#{escape(c['id'])}\"><span class=\"num\">{i:02d}</span>"
         f"<span class=\"q\">{escape(c['question'])}</span>{_chip(c['verdict'])}</a></li>"
-        for i, c in enumerate(cards, 1))
+        for i, c in enumerate(cards, 1)) + spotted
     return (f"<nav class=\"glance\" aria-label=\"At a glance\"><h2 class=\"kicker\">At a glance"
             f"</h2><ol>{rows}</ol></nav>")
 
@@ -79,7 +149,7 @@ def _scale(s: dict) -> str:
             f"requests add up to more than Alberta has ever used at once.</p></section>")
 
 
-def _card(i: int, c: dict, sources: dict[str, dict]) -> str:
+def _card(i: int, c: dict, sources: dict[str, dict], recent: list[dict] = ()) -> str:
     lead, rest = _split(c["explain"])
     label = escape(next(iter(c["chart"]["series"]))) if c["chart"] else ""
     chart = (f"<figure class=\"chart\"><canvas id=\"chart-{escape(c['id'])}\" role=\"img\" "
@@ -94,6 +164,7 @@ def _card(i: int, c: dict, sources: dict[str, dict]) -> str:
   <div class="text"><p class="lead">{escape(lead)}</p>{rest_p}</div>
 </div>
 {chart}
+{_recent(list(recent))}
 <details class="more"><summary>How we know &amp; sources</summary>
   <div class="more-body">
     <div><h3>Method and caveats</h3><ul>{how}</ul></div>
@@ -110,7 +181,10 @@ def render(data: dict, sources: dict[str, dict]) -> str:
              # Shown by the script below if the daily job itself stops publishing.
              f"<p id=\"stale-live\" hidden class='alert' role='alert'>This page hasn't updated "
              f"in over {STALE_HOURS} hours, so the numbers below may be out of date.</p>")
-    cards = "\n".join(_card(i, c, sources) for i, c in enumerate(data["cards"], 1))
+    w = data.get("watch") or {}
+    per_card = w.get("per_card", {})
+    cards = "\n".join(_card(i, c, sources, per_card.get(c["id"], []))
+                      for i, c in enumerate(data["cards"], 1))
     charts = json.dumps({c["id"]: c["chart"] for c in data["cards"] if c["chart"]})
     charts = charts.replace("</", "<\\/")
     return f"""<!doctype html>
@@ -268,6 +342,34 @@ a {{ color:var(--accent); text-underline-offset:3px; }}
 .more li + li {{ margin-top:6px; }}
 .src li span {{ display:block; font-size:.82rem; color:var(--ink-2); }}
 
+/* Spotted this week: AI-extracted claims, each with its verified quote. */
+.spotted {{ border-top:3px double var(--ink); margin-top:34px; padding-top:28px; }}
+.spot-head {{ font:800 clamp(1.5rem, 3.6vw, 2.1rem)/1.15 var(--serif); margin:0 0 8px; }}
+.ai {{ font:400 .88rem/1.5 var(--ui); color:var(--ink-2); margin:0 0 18px; max-width:720px; }}
+.claims {{ list-style:none; margin:0; padding:0; display:grid; gap:14px;
+           grid-template-columns:repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }}
+.claim {{ background:var(--sheet); border:1px solid var(--rule); border-radius:18px;
+          padding:16px 18px; display:flex; flex-direction:column; gap:8px;
+          transition:transform .3s var(--ease), border-color .3s; }}
+.claim:hover {{ transform:translateY(-2px); border-color:var(--accent); }}
+.claim .what {{ font:700 1.02rem/1.35 var(--ui); margin:0; }}
+.claim blockquote {{ margin:0; padding-left:12px; border-left:3px solid var(--accent);
+                     font:italic 400 1rem/1.5 var(--serif); color:var(--ink-2); }}
+.claim blockquote::before {{ content:"“"; }}
+.claim blockquote::after {{ content:"”"; }}
+.claim .who {{ font:400 .85rem/1.4 var(--ui); color:var(--ink-2); margin:0; }}
+.claim .tags {{ display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; margin:2px 0 0; }}
+.tag {{ font:700 .72rem/1 var(--ui); letter-spacing:.1em; text-transform:uppercase;
+        color:var(--ink-2); border:1px solid var(--rule); border-radius:99px; padding:5px 9px; }}
+.claim .chip {{ font-size:.76rem; padding:4px 10px; }}
+.rel {{ font:600 .82rem/1.2 var(--ui); }}
+.host {{ font:600 .74rem/1 var(--ui); color:var(--ink-2); border:1px solid var(--rule);
+         border-radius:6px; padding:2px 6px; margin-left:4px; white-space:nowrap; }}
+.changed {{ font:400 .92rem/1.6 var(--ui); color:var(--ink-2); padding-left:18px; }}
+.spotted h3, .recent h3 {{ font:700 .74rem/1 var(--ui); letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-2); margin:22px 0 12px; }}
+.recent {{ margin-top:22px; }}
+
 footer {{ border-top:3px double var(--ink); margin-top:20px; padding-top:18px;
           font:400 .9rem/1.6 var(--ui); color:var(--ink-2); columns:2 300px; column-gap:40px;
           column-rule:1px solid var(--rule); }}
@@ -301,7 +403,8 @@ footer p {{ margin:0 0 10px; break-inside:avoid; }}
   <hr class="rule">
   {stale}
 </header>
-<div class="front">{_glance(data["cards"])}{_scale(data["scale"])}</div>
+<div class="front">{_glance(data["cards"], w)}{_scale(data["scale"])}</div>
+{_spotted(w)}
 <main data-as-of="{escape(data['as_of_utc'])}">
 {cards}
 </main>

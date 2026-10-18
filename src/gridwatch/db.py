@@ -50,6 +50,30 @@ CREATE TABLE IF NOT EXISTS chunks (
     text text NOT NULL,
     embedding vector(384) NOT NULL,
     PRIMARY KEY (doc_key, ord)
+);
+-- Last content change of a tracked document (claim watch).
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS changed_on date;
+-- Fingerprint of the visible text: markup-only edits (e.g. CSRF tokens) aren't changes.
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS text_sha text;
+CREATE TABLE IF NOT EXISTS articles (
+    url text PRIMARY KEY,  -- canonical URL (watch.canonical_url)
+    title text,
+    outlet text,
+    published date,
+    fetched_at timestamptz NOT NULL DEFAULT now(),
+    status text NOT NULL,  -- ok, unreadable, too_long, extract_failed
+    source_kind text NOT NULL  -- news, official
+);
+CREATE TABLE IF NOT EXISTS claims (
+    id text PRIMARY KEY,  -- watch.claim_id(url, quote)
+    article_url text NOT NULL REFERENCES articles ON DELETE CASCADE,
+    claim text NOT NULL,
+    speaker text,
+    quote text NOT NULL,
+    topic text NOT NULL,
+    numbers jsonb NOT NULL DEFAULT '[]',
+    model text NOT NULL,
+    extracted_at timestamptz NOT NULL DEFAULT now()
 );"""
 
 

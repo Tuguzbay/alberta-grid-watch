@@ -17,9 +17,11 @@ jobs:
       PYTHONTZPATH: ""  # use the tzdata package, not the runner's possibly older system zoneinfo
       AESO_API_KEY: ${{ secrets.AESO_API_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     outputs:
       run: ${{ steps.guard.outputs.run }}
       daily: ${{ steps.daily.outcome }}
+      watch: ${{ steps.watch.outcome }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,6 +35,12 @@ jobs:
         if: steps.guard.outputs.run == 'true'
         continue-on-error: true
         run: python scripts/daily.py
+      # Claim watch: changed official documents + new articles -> verified claims (Haiku).
+      # Like the data update, a failure here still rebuilds the page and fails the run later.
+      - id: watch
+        if: steps.guard.outputs.run == 'true'
+        continue-on-error: true
+        run: python scripts/watch.py
       - if: steps.guard.outputs.run == 'true'
         run: python scripts/build_site.py
       # Upload first: the snapshot commit and re-enable are best effort and mustn't block deploy.
@@ -66,3 +74,6 @@ jobs:
       - name: Fail the run if the data update failed
         if: needs.build.outputs.daily == 'failure'
         run: echo "scripts/daily.py failed; page rebuilt from older data" && exit 1
+      - name: Fail the run if the claim watch failed
+        if: needs.build.outputs.watch == 'failure'
+        run: echo "scripts/watch.py failed; page rebuilt with the claims already stored" && exit 1
