@@ -2,14 +2,15 @@
 
 **Meta in Alberta: claims vs data.** A public page, rebuilt every day, that checks the worries people raise about Meta's AI data centre in Sturgeon County, and the promises the government makes about it, against Alberta grid data and public documents.
 
+**Live:** https://tuguzbay.github.io/alberta-grid-watch/ (rebuilt daily)
+
 > Scenario outputs are **illustrative**, not predictions, and nothing here attributes a causal price impact to any specific project.
 
-Status and next steps: [PROGRESS.md](PROGRESS.md).
-
-**Live:** https://tuguzbay.github.io/alberta-grid-watch/ ("Meta in Alberta: claims vs data", rebuilt daily)
+How it runs, what needs maintenance, and the caveats: [PROGRESS.md](PROGRESS.md).
 
 ## Parts
-1. **Claims page** (the live site): four questions (blackouts, power bills, emissions, water), each with a headline number, a rule-based verdict, a chart, "How we know" and its sources, plus a "How big is it?" scale strip. Broadsheet-meets-product-page design, light/dark switch.
+1. **Claims page** (the live site): four questions (blackouts, power bills, emissions, water), each with a headline number, a verdict in plain words ("Less backup than last year", "The promised 6% cut adds up"), a chart, "How we know" and its sources, plus a "How big is it?" scale strip. Verdicts come from fixed rules over the numbers, never from a model. Broadsheet-meets-product-page design, light/dark switch.
+   - **Power bills:** the government says Meta pays ~$200M a year in transmission fees, cutting the transmission part of household bills by up to 6%. The card checks the share against AESO's 2026 transmission cost ($2.64B, so 7.6%) and recomputes the fee itself from AESO's 2026 Rate DTS: **$194–198M a year** for 970 MW, so the government's figure checks out.
    - **Meta's size:** per the government's [By the numbers](https://www.alberta.ca/datacentres/numbers) page, **970 MW** is Meta's AESO-approved phase 1 grid allocation and **1,800 MW** the campus draw at full build-out (grid plus on-site generation, no date given). The Greenlight gas plant is 932 MW nameplate. The blackouts card and scale strip use 970 MW (what the grid carries). Emissions and water headlines are phase 1, with the full build-out figure beside them.
 2. **Claim watch**: every day, Claude Haiku finds new articles and changed official documents and extracts the claims they make. A claim is published only if its quote appears word for word in the source. Shown in "Spotted this week" (a swipeable carousel) and inside each card. Each card leads with the verified quote; Haiku's one-line summary follows, marked "AI summary". Source links open the article scrolled to the quote and highlight it.
 3. **Pool price & demand forecasting**: next-day hourly forecasts against simple baselines, with a model-health page (`health.html`, same look as the claims page).
@@ -32,14 +33,14 @@ pip install -e ".[dev]"
 pytest                          # offline tests (DB tests skip if Postgres isn't up)
 pytest -m live                  # hits real AESO API
 set -a; . ./.env; set +a        # load the key into the shell
-python scripts/check_sources.py # Phase 0 source check
+python scripts/check_sources.py # check every data source responds
 docker compose up --build       # API on :8000, Postgres+pgvector on :5432
 python scripts/ingest.py --start 2020-01-01   # backfill `hourly` (~1 min), prints quality report
 python scripts/ingest.py        # daily update: re-fetches last 7 days (safe to rerun)
-python scripts/backtest.py      # Phase 2 walk-forward backtest, rewrites Results below
+python scripts/backtest.py      # walk-forward backtest, rewrites Results below
 python scripts/cushion.py       # supply-cushion analysis, rewrites its README section
 python scripts/impacts.py       # emissions/water arithmetic, rewrites its README section
-python scripts/daily.py         # 10:00 MT daily: ingest + forecast tomorrow (safe to rerun)
+python scripts/daily.py         # ingest + forecast tomorrow (safe to rerun)
 # model-health page: http://localhost:8000/  (JSON: /api/health)
 python scripts/rag_ingest.py    # fetch, chunk, embed rag/sources.csv (--force after chunking changes)
 python scripts/rag_eval.py      # retrieval eval + abstention threshold sweep
@@ -47,7 +48,6 @@ curl -X POST localhost:8000/api/ask -H 'content-type: application/json' -d '{"q"
 python scripts/watch.py         # claim watch (needs ANTHROPIC_API_KEY; skips cleanly without)
 python scripts/build_site.py    # writes site/ (index.html, health.html, data.json) + snapshot
 DATABASE_URL="$SUPABASE_URL" python scripts/watch.py   # run against production (Supabase)
-powershell -File scripts/register_task.ps1   # old Windows task (superseded by GitHub Actions)
 ```
 
 ## Architecture
@@ -55,7 +55,7 @@ powershell -File scripts/register_task.ps1   # old Windows task (superseded by G
 GitHub Actions, daily at 10:05 Mountain time (.github/workflows/daily.yml)
   should_run.py   guard: after 10:00 local and not yet issued today (or a manual run)
   daily.py        AESO + Open-Meteo -> Supabase `hourly`; next-day forecast -> `forecasts`
-  watch.py        19 official docs re-checked (visible-text fingerprint)
+  watch.py        official docs in rag/sources.csv re-checked (visible-text fingerprint)
                   + Haiku web search -> our fetch -> Haiku extraction -> whole-word quote check
                   -> `articles` / `claims`
   build_site.py   claims.py (numbers + verdict rules) + claims_page.py -> site/index.html
