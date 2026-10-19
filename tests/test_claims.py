@@ -65,6 +65,18 @@ def test_bills_verdict_thresholds(monkeypatch, rr, verdict):
     assert claims.bills_card(frame(), NOW)["verdict"] == verdict
 
 
+def test_dts_estimate_for_meta():
+    low, high = claims.dts_estimate(970)
+    assert high == pytest.approx(197.7e6, rel=1e-3)  # flat 970 MW, worked by hand from Rate DTS
+    assert 190e6 < low < high
+
+
+def test_bills_card_cross_checks_the_fee(monkeypatch):
+    assert "checks out" in claims.bills_card(frame(), NOW)["explain"]
+    monkeypatch.setitem(claims.FACTS["meta_transmission_fees"], "value", 300e6)
+    assert "doesn't match" in claims.bills_card(frame(), NOW)["explain"]
+
+
 def test_emissions_card_matches_footprint():
     card = claims.emissions_card()
     assert f"{impacts.footprint(970)['co2_mt']:.1f}" in card["headline"]
