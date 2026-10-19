@@ -35,13 +35,13 @@ def test_scale_record_from_data():
 def test_reliability_verdict_rises():
     df = frame(tight=[("2025-02-01", 10), ("2026-02-01", 100)])
     card = claims.reliability_card(df, NOW)
-    assert card["verdict"] == "More hours leaning on wind, solar and imports"
+    assert card["verdict"] == "Less backup than last year"
     assert card["headline"].startswith("100 hours in 2026 when gas, hydro and storage")
 
 
 def test_reliability_verdict_zero_tight_hours():
     card = claims.reliability_card(frame(), NOW)
-    assert card["verdict"] == "Not so far"
+    assert card["verdict"] == "No sign of strain"
     assert card["headline"].startswith("0 hours in 2026 when")
     assert not any(bad in s for s in strings(card) for bad in ("nan", "inf"))
 
@@ -55,11 +55,12 @@ def test_reliability_card_on_stale_frame():
 
 def test_bills_card_without_denominator(monkeypatch):
     monkeypatch.setitem(claims.FACTS["transmission_rr"], "value", None)
-    assert claims.bills_card(frame(), NOW)["verdict"] == "Can't verify yet"
+    assert claims.bills_card(frame(), NOW)["verdict"] == "Can't check the 6% cut yet"
 
 
-@pytest.mark.parametrize("rr, verdict", [(2e9, "Plausible"), (5e9, "Partly true"),
-                                         (1e10, "Overstated")])
+@pytest.mark.parametrize("rr, verdict", [(2e9, "The promised 6% cut adds up"),
+                                         (5e9, "Only part of the 6% cut adds up"),
+                                         (1e10, "The 6% cut doesn't add up")])
 def test_bills_verdict_thresholds(monkeypatch, rr, verdict):
     monkeypatch.setitem(claims.FACTS["transmission_rr"], "value", rr)
     assert claims.bills_card(frame(), NOW)["verdict"] == verdict
@@ -80,7 +81,7 @@ def test_bills_card_cross_checks_the_fee(monkeypatch):
 def test_emissions_card_matches_footprint():
     card = claims.emissions_card()
     assert f"{impacts.footprint(970)['co2_mt']:.1f}" in card["headline"]
-    assert card["verdict"] == "Significant"
+    assert card["verdict"] == "Big: up to 16% of Alberta's power emissions"
 
 
 def test_every_card_has_sources_and_how():
