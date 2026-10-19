@@ -34,6 +34,26 @@ FACTS = {
                         "source": "aeso_tariff_rr"},
 }
 
+# AESO Rate DTS effective 2026-01-01 (source key aeso_rate_dts), in $.
+DTS_PER_MW_MONTH = 10_927 + 2_987 + 50  # bulk coincident demand, regional capacity, other support
+DTS_PER_MWH = 1.23 + 0.93 + 0.15  # bulk energy, regional energy, voltage control
+DTS_POD_MONTH = 15_562  # substation fraction 1
+DTS_POD_TIERS = [(7.5, 5_122), (9.5, 3_037), (23, 2_033), (math.inf, 1_252)]  # (MW, $/MW/month)
+
+
+def dts_estimate(mw: float) -> tuple[float, float]:
+    """Yearly Rate DTS connection charge for a load of `mw`, at 80% and 100% load factor.
+
+    Assumes one point of delivery and the full `mw` at every monthly system peak. Excludes the
+    operating reserve and constraint charges, which follow the pool price.
+    """
+    pod, left = DTS_POD_MONTH, mw
+    for size, rate in DTS_POD_TIERS:
+        pod += min(left, size) * rate
+        left -= min(left, size)
+    fixed = 12 * (mw * DTS_PER_MW_MONTH + pod)
+    return tuple(fixed + mw * 8760 * lf * DTS_PER_MWH for lf in (0.8, 1.0))
+
 
 def _num(x) -> float | None:
     return None if x is None or (isinstance(x, float) and math.isnan(x)) else float(x)
@@ -129,6 +149,14 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
                     "Overstated": "a 6% cut looks overstated"}[verdict]
                  + ". It's an upper bound: total transmission "
                  "costs also grow, partly to connect new loads.")
+    low, high = dts_estimate(META_MW)
+    ours = f"${low / 1e6:,.0f}–{high / 1e6:,.0f}M"
+    if 0.9 * low <= fees <= 1.1 * high:
+        check += (f" Our own estimate from AESO's 2026 rates is {ours} a year, so the "
+                  f"government's ~${fees / 1e6:,.0f}M checks out.")
+    else:
+        check += (f" Our own estimate from AESO's 2026 rates is {ours} a year, which doesn't "
+                  f"match the government's ~${fees / 1e6:,.0f}M.")
     past = p[:now].tz_convert(TZ)
     monthly = past.groupby(past.index.strftime("%Y-%m")).mean().dropna()
     monthly = monthly[monthly.index >= "2020-01"]
@@ -144,9 +172,13 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
             "Pool price is the wholesale price, from AESO data. Most households are on "
             "fixed-rate or regulated plans, so it isn't your bill.",
             "The 6% claim is only about the transmission line on your bill, not the whole bill.",
-            "The $200M figure is the government's. We haven't checked it independently.",
+            f"Our fee estimate applies AESO's 2026 Rate DTS to {META_MW} MW: the full draw at "
+            "every monthly system peak, one point of delivery, and 80–100% average use. It "
+            "leaves out operating reserves, which follow the pool price (roughly $20M more at "
+            "today's prices).",
         ],
-        "sources": ["goa_bills"] + ([FACTS["transmission_rr"]["source"]] if rr else []),
+        "sources": ["goa_bills"] + ([FACTS["transmission_rr"]["source"]] if rr else [])
+        + ["aeso_rate_dts"],
     }
 
 
