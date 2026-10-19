@@ -25,9 +25,9 @@ GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16
          "7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/sv"
          "g%3E")
 # Chip colour by what the verdict means for residents; anything else is neutral.
-TONE = {"Not so far": "good", "Plausible": "good", "Small": "good",
-        "More hours leaning on wind, solar and imports": "warn", "Overstated": "warn",
-        "Significant": "warn"}
+# Keyed by the text before ":" so a verdict can carry its number ("Big: up to 16% of ...").
+TONE = {"No sign of strain": "good", "The promised 6% cut adds up": "good", "Small": "good",
+        "Less backup than last year": "warn", "The 6% cut doesn't add up": "warn", "Big": "warn"}
 # Colour and type tokens, shared with the model-health page.
 LIGHT = """--paper:#f3eee3; --sheet:#fbf8f1; --ink:#161513; --ink-2:#4a463f; --rule:#cfc6b4;
     --accent:#0a5cff; --accent-soft:#e3ecff; --shadow:#0004;
@@ -161,7 +161,8 @@ def _sources(keys: list[str], sources: dict[str, dict]) -> str:
 
 
 def _chip(verdict: str) -> str:
-    return f"<span class=\"chip {TONE.get(verdict, 'neutral')}\">{escape(verdict)}</span>"
+    tone = TONE.get(verdict.split(":")[0], "neutral")
+    return f"<span class=\"chip {tone}\">{escape(verdict)}</span>"
 
 
 def _glance(cards: list[dict], w: dict) -> str:

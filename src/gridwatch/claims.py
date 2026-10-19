@@ -95,7 +95,7 @@ def reliability_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
         "id": "reliability",
         "question": "Will it cause blackouts?",
         "headline": f"{n_this:,} hours in {loc.year} when gas, hydro and storage alone fell short",
-        "verdict": "Not so far" if calm else "More hours leaning on wind, solar and imports",
+        "verdict": "No sign of strain" if calm else "Less backup than last year",
         "explain": (f"In these hours, available gas, hydro and storage couldn't cover demand on "
                     f"their own, so wind, solar or imports filled the gap. That's a thinner "
                     f"cushion, not a blackout. Alberta had {n_this:,} such hours this year, "
@@ -135,18 +135,20 @@ def bills_card(df: pd.DataFrame, now: pd.Timestamp) -> dict:
     rr = FACTS["transmission_rr"]["value"]
     fees = FACTS["meta_transmission_fees"]["value"]
     if rr is None:
-        verdict = "Can't verify yet"
+        verdict = "Can't check the 6% cut yet"
         check = ("We couldn't find AESO's total transmission cost in a public source we could "
                  "check, so the 6% claim can't be tested yet.")
     else:
         share = fees / rr
-        verdict = "Plausible" if share >= 0.06 else "Overstated" if share < 0.03 else "Partly true"
+        verdict = ("The promised 6% cut adds up" if share >= 0.06
+                   else "The 6% cut doesn't add up" if share < 0.03
+                   else "Only part of the 6% cut adds up")
         check = (f"The government says Meta's ~${fees / 1e6:,.0f}M a year in transmission fees "
                  f"will cut the transmission part of household bills by up to 6%. That's "
                  f"{share:.1%} of AESO's ${rr / 1e9:,.2f}B transmission cost for 2026, so "
-                 + {"Plausible": "a 6% cut is plausible",
-                    "Partly true": "the fees could cover only part of a 6% cut",
-                    "Overstated": "a 6% cut looks overstated"}[verdict]
+                 + ("a 6% cut is plausible" if share >= 0.06
+                    else "a 6% cut looks overstated" if share < 0.03
+                    else "the fees could cover only part of a 6% cut")
                  + ". It's an upper bound: total transmission "
                  "costs also grow, partly to connect new loads.")
     low, high = dts_estimate(META_MW)
@@ -189,7 +191,8 @@ def emissions_card() -> dict:
         "id": "emissions",
         "question": "Is it bad for emissions?",
         "headline": f"Phase 1: up to {f['co2_mt']:.1f} Mt CO₂ a year if it all ran on gas",
-        "verdict": "Significant" if share >= 0.10 else "Noticeable" if share >= 0.03 else "Small",
+        "verdict": ("Big" if share >= 0.10 else "Noticeable" if share >= 0.03 else "Small")
+        + f": up to {share:.0%} of Alberta's power emissions",
         "explain": (f"If all {META_MW} MW ran around the clock on new gas, it would emit about "
                     f"{f['co2_mt']:.1f} million tonnes of CO₂ a year, {share:.0%} of what "
                     f"Alberta's power sector emitted in 2023. That's phase 1; at full build-out "

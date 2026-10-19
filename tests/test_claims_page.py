@@ -207,3 +207,8 @@ def test_spotted_is_a_carousel_with_hidden_bar_until_script_runs():
     html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
     assert '<div class="car-bar" hidden>' in html
     assert 'aria-label="Previous claims"' in html and 'aria-label="Next claims"' in html
+
+
+def test_chip_tone_ignores_the_number_after_the_colon():
+    assert 'class="chip warn"' in claims_page._chip("Big: up to 16% of Alberta's power emissions")
+    assert 'class="chip neutral"' in claims_page._chip("Depends on the plant's cooling")
