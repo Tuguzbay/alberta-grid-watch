@@ -1,5 +1,5 @@
 {
- "as_of_utc": "2026-11-07T18:00:00+00:00",
+ "as_of_utc": "2026-11-08T19:00:00+00:00",
  "scale": {
   "meta_mw": 970,
   "meta_full_mw": 1800,
@@ -17,7 +17,7 @@
   },
   {
    "id": "bills",
-   "headline": "$36/MWh over the last year, down 20% on the year before",
+   "headline": "$35/MWh over the last year, down 20% on the year before",
    "verdict": "The promised 6% cut adds up"
   },
   {
