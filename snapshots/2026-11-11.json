@@ -1,5 +1,5 @@
 {
- "as_of_utc": "2026-11-10T20:00:00+00:00",
+ "as_of_utc": "2026-11-11T22:00:00+00:00",
  "scale": {
   "meta_mw": 970,
   "meta_full_mw": 1800,
@@ -12,7 +12,7 @@
  "cards": [
   {
    "id": "reliability",
-   "headline": "599 hours in 2026 when gas, hydro and storage alone fell short",
+   "headline": "601 hours in 2026 when gas, hydro and storage alone fell short",
    "verdict": "Less backup than last year"
   },
   {
