@@ -42,6 +42,17 @@ def test_recent_claims_excludes_hidden_and_old(conn):
     assert watch.recent_claims(conn, future, set()) == []
 
 
+def test_recent_claims_shows_a_repeated_quote_once(conn):
+    wire, part = "https://www.cp24.com/same-wire-story", "https://example.ca/part"
+    for u in (URL, wire, part):
+        save(conn, url=u)
+    watch.save_claims(conn, URL, [CLAIM])
+    watch.save_claims(conn, wire, [CLAIM.model_copy(update={"quote": CLAIM.quote + "."})])
+    watch.save_claims(conn, part, [CLAIM.model_copy(update={"quote": CLAIM.quote[4:]})])
+    rows = watch.recent_claims(conn, datetime(2026, 10, 1, tzinfo=UTC), set())
+    assert len(rows) == 1
+
+
 def test_last_run_none_when_empty(conn):
     assert watch.last_run(conn) is None
     save(conn)
