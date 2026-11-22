@@ -200,7 +200,7 @@ def test_claim_link_jumps_to_quote():
 def test_claim_card_puts_verified_quote_before_ai_summary():
     html = claims_page.render(with_watch([wclaim(1)]), SOURCES)
     card = html[html.index('<li class="claim">'):]
-    assert card.index("<blockquote>") < card.index("AI summary")
+    assert card.index("<blockquote>") < card.index("What it means (AI)")
 
 
 def test_spotted_is_a_carousel_with_hidden_bar_until_script_runs():

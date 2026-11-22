@@ -101,7 +101,7 @@ def _claim(c: dict, related: bool = True) -> str:
     topic = escape(TOPIC_LABEL.get(c["topic"], "Other"))
     # Quote first: it's the only part checked word for word; the summary is the AI's reading.
     return (f"<li class=\"claim\"><blockquote>{escape(c['quote'])}</blockquote>"
-            f"<p class=\"what\"><span>AI summary</span> {escape(c['claim'])}</p>"
+            f"<p class=\"what\"><span>What it means (AI)</span> {escape(c['claim'])}</p>"
             f"<p class=\"who\">{escape(c['speaker'])} · {link}</p>"
             f"<p class=\"tags\"><span class=\"tag\">{topic}</span>"
             f"<span class=\"chip neutral\">Not checked yet</span>{rel}</p></li>")
