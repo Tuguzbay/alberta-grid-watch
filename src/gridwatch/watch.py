@@ -158,7 +158,8 @@ water, land and community, jobs and the economy). For each claim:
 - quote: one continuous passage copied exactly from the article (same words and punctuation)
   that contains the claim, at least 9 words long. Never join pieces from different places.
 - topic: one of bills, reliability, emissions, water, land_community, jobs_economy, other.
-- numbers: figures in the quote that the claim is about, exactly as written (e.g. "$460 a year", "1,400 MW"); [] if none.
+- numbers: figures in the quote that the claim is about, exactly as written
+  (e.g. "$460 a year", "1,400 MW"); [] if none.
 
 Do not judge whether claims are true. Skip opinions with no checkable content, and skip
 background facts (population, geography, history) unless they are the point of the claim. If the
